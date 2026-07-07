@@ -1,0 +1,1 @@
+CALL_RING_TIMEOUT = 30  # seconds
