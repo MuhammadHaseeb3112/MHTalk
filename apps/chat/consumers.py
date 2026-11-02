@@ -1,14 +1,24 @@
 import json
 from django.db.models import Q
+from rest_framework.exceptions import ValidationError
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.utils import timezone
 
 from apps.accounts.models import Profile
+from apps.accounts.privacy import mask_receipt_results, presence_for_viewer, presence_snapshot_for
 
 from .choices import MessageType, RoomType
-from .models import ChatRoom, Message, Reaction,Attachment, VoiceNote, BlockedUser
+from .models import ChatRoom, Participant, Message, Reaction, Attachment, VoiceNote, BlockedUser, MessageReceipt
+from .permissions import send_message_error
 from .serializers import MessageSerializer
+from .utils import (
+    blocked_user_ids,
+    broadcast_message as broadcast_message_everywhere,
+    persist_message_receipt,
+    persist_receipts_bulk,
+    sender_has_blocked_peer,
+)
 
  
 
@@ -23,6 +33,23 @@ class ChatConsumer(AsyncWebsocketConsumer):
     """
     WebSocket consumer for chat rooms.
     """
+
+    @staticmethod
+    def parse_positive_id(value):
+        """Safely parse a positive integer ID from a WebSocket payload."""
+        if isinstance(value, bool):
+            return None
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        return parsed if parsed > 0 else None
+
+    async def send_error(self, message: str) -> None:
+        await self.send(text_data=json.dumps({
+            "type": "error",
+            "message": message,
+        }))
 
     async def connect(self) -> None:
         """
@@ -65,8 +92,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         await self.accept()
 
-        await self.set_user_online()
-        await self.broadcast_presence(True)
+        # Online/offline is owned by ChatInboxConsumer (connection counted per
+        # tab). Here we only send the joining client a presence snapshot of the
+        # other participants so the chat header is correct immediately.
+        for snapshot in await self.get_presence_snapshot():
+            await self.send(text_data=json.dumps({"type": "presence", **snapshot}))
 
 
     async def disconnect(
@@ -78,10 +108,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
         """
 
         if hasattr(self, "room_group_name"):
-            await self.set_user_offline()
-
-            await self.broadcast_presence(False)
-
+            # Ensure a disconnect during typing cannot leave the peer stuck on
+            # "typing…". App-level online presence is managed by ChatInboxConsumer.
+            try:
+                await self.broadcast_typing(False)
+            except Exception:
+                pass
             await self.channel_layer.group_discard(
                 self.room_group_name,
                 self.channel_name,
@@ -98,22 +130,25 @@ class ChatConsumer(AsyncWebsocketConsumer):
         try:
             data = json.loads(text_data)
 
-        except json.JSONDecodeError:
-            await self.send(
-                text_data=json.dumps(
-                    {
-                        "type": "error",
-                        "message": "Invalid JSON.",
-                    }
-                )
-            )
+        except (json.JSONDecodeError, TypeError):
+            await self.send_error("Invalid JSON.")
             return
-        
+
+        if not isinstance(data, dict):
+            await self.send_error("WebSocket payload must be a JSON object.")
+            return
+
+        if data.get("type") == "ping":
+            await self.send(text_data=json.dumps({"type": "pong"}))
+            return
+
         if data.get("type") == "typing":
 
-            is_typing = bool(
-                data.get("is_typing", False)
-            )
+            is_typing_value = data.get("is_typing", False)
+            if not isinstance(is_typing_value, bool):
+                await self.send_error("is_typing must be a boolean.")
+                return
+            is_typing = is_typing_value
 
 
 
@@ -130,87 +165,46 @@ class ChatConsumer(AsyncWebsocketConsumer):
         
         if data.get("type") == "delivered":
 
-            message_id = data.get(
-                "message_id",
-            )
+            message_id = self.parse_positive_id(data.get("message_id"))
 
             if message_id is None:
-                await self.send(
-                    text_data=json.dumps(
-                        {
-                            "type": "error",
-                            "message": "message_id is required.",
-                        }
-                    )
+                await self.send_error(
+                    "A valid positive message_id is required."
                 )
                 return
 
-            updated = await self.mark_message_delivered(
-                message_id,
-            )
-
+            updated = await self.mark_message_delivered(message_id)
             if updated:
-                sender_id = await self.get_message_sender_id(
-                    message_id,
-                )
-
-                if sender_id is not None:
-                    await self.broadcast_delivered(
-                        message_id,
-                        sender_id,
-                    )
+                await self.broadcast_delivered(message_id, updated["sender_id"], updated)
 
             return
         
         if data.get("type") == "read":
 
-            message_id = data.get(
-                "message_id",
-            )
+            message_id = self.parse_positive_id(data.get("message_id"))
 
             if message_id is None:
-                await self.send(
-                    text_data=json.dumps(
-                        {
-                            "type": "error",
-                            "message": "message_id is required.",
-                        }
-                    )
+                await self.send_error(
+                    "A valid positive message_id is required."
                 )
                 return
 
-            updated = await self.mark_message_read(
-                message_id,
-            )
-
-            if updated:
-                sender_id = await self.get_message_sender_id(
-                    message_id,
-                )
-
-                if sender_id is not None:
-                    await self.broadcast_read(
-                        message_id,
-                        sender_id,
-                    )
+            updated = await self.mark_message_read(message_id)
+            if updated and updated.get("receipt") == "delivered":
+                await self.broadcast_delivered(message_id, updated["sender_id"], updated)
+            elif updated:
+                await self.broadcast_read(message_id, updated["sender_id"], updated)
 
             return
         
 
         if data.get("type") == "edit":
 
-            message_id = data.get(
-                "message_id",
-            )
+            message_id = self.parse_positive_id(data.get("message_id"))
 
             if message_id is None:
-                await self.send(
-                    text_data=json.dumps(
-                        {
-                            "type": "error",
-                            "message": "message_id is required.",
-                        }
-                    )
+                await self.send_error(
+                    "A valid positive message_id is required."
                 )
                 return
             
@@ -260,18 +254,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         if data.get("type") == "delete":
 
-            message_id = data.get(
-                "message_id",
-            )
+            message_id = self.parse_positive_id(data.get("message_id"))
 
             if message_id is None:
-                await self.send(
-                    text_data=json.dumps(
-                        {
-                            "type": "error",
-                            "message": "message_id is required.",
-                        }
-                    )
+                await self.send_error(
+                    "A valid positive message_id is required."
                 )
                 return
 
@@ -290,34 +277,25 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 )
                 return
 
-            await self.broadcast_delete(
-                message_id,
-            )
+            # soft_delete_messages_for_everyone already broadcast the deletion.
 
             return
         
         if data.get("type") == "reaction":
 
-            message_id = data.get(
-                "message_id",
-            )
+            message_id = self.parse_positive_id(data.get("message_id"))
 
             emoji = data.get(
                 "emoji",
             )
 
             if message_id is None:
-                await self.send(
-                    text_data=json.dumps(
-                        {
-                            "type": "error",
-                            "message": "message_id is required.",
-                        }
-                    )
+                await self.send_error(
+                    "A valid positive message_id is required."
                 )
                 return
 
-            if not emoji:
+            if not isinstance(emoji, str) or len(emoji) > 20:
                 await self.send(
                     text_data=json.dumps(
                         {
@@ -354,28 +332,25 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         if data.get("type") == "pin":
 
-            message_id = data.get(
-                "message_id",
-            )
+            message_id = self.parse_positive_id(data.get("message_id"))
 
             is_pinned = data.get(
                 "is_pinned",
             )
 
             if message_id is None:
-                await self.send(
-                    text_data=json.dumps(
-                        {
-                            "type": "error",
-                            "message": "message_id is required.",
-                        }
-                    )
+                await self.send_error(
+                    "A valid positive message_id is required."
                 )
+                return
+
+            if not isinstance(is_pinned, bool):
+                await self.send_error("is_pinned must be a boolean.")
                 return
 
             updated = await self.pin_message(
                 message_id,
-                bool(is_pinned),
+                is_pinned,
             )
 
             if not updated:
@@ -391,7 +366,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
             await self.broadcast_pin(
                 message_id,
-                bool(is_pinned),
+                is_pinned,
             )
 
             return
@@ -400,23 +375,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         if data.get("type") == "forward":
 
-            message_id = data.get(
-                "message_id",
-            )
+            message_id = self.parse_positive_id(data.get("message_id"))
 
             if message_id is None:
-                await self.send(
-                    text_data=json.dumps(
-                        {
-                            "type": "error",
-                            "message": "message_id is required.",
-                        }
-                    )
+                await self.send_error(
+                    "A valid positive message_id is required."
                 )
                 return
             
 
-            blocked = await self.is_private_chat_blocked()
+            denied = await self.send_denied_reason()
+            if denied:
+                await self.send_error(denied)
+                return
+
+            blocked = await self.sender_blocked_peer()
 
             if blocked:
                 await self.send(
@@ -424,8 +397,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         {
                             "type": "error",
                             "message": (
-                                "You cannot send messages "
-                                "to this user."
+                                "Unblock this contact to send a message."
                             ),
                         }
                     )
@@ -453,6 +425,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
             return
 
+        # Only an explicit (or legacy untyped) "send" creates a message; any
+        # other control frame we don't know is ignored instead of turning
+        # into an empty-message error.
+        if data.get("type") not in (None, "", "message", "chat_message", "send"):
+            return
+
         message_type = data.get(
             "message_type",
             MessageType.TEXT,
@@ -469,13 +447,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
             return
 
+        if message_type in (MessageType.POLL, MessageType.LOCATION):
+            # They need structured validation: use POST /api/chat/messages/.
+            await self.send_error("Send polls and locations through the REST API.")
+            return
+
         content = data.get(
             "content",
             "",
         )
 
-        if isinstance(content, str):
-            content = content.strip()
+        if not isinstance(content, str):
+            await self.send_error("content must be a string.")
+            return
+
+        content = content.strip()
 
         if (
             message_type == MessageType.TEXT
@@ -491,11 +477,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
             return
         
-        reply_to = data.get(
-            "reply_to",
-        )
+        reply_to_raw = data.get("reply_to")
+        reply_to = None
 
-        if reply_to:
+        if reply_to_raw not in (None, ""):
+            reply_to = self.parse_positive_id(reply_to_raw)
+            if reply_to is None:
+                await self.send_error("reply_to must be a valid positive message ID.")
+                return
 
             exists = await self.reply_message_exists(
                 reply_to,
@@ -513,7 +502,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 return
             
 
-        blocked = await self.is_private_chat_blocked()
+        denied = await self.send_denied_reason()
+        if denied:
+            await self.send_error(denied)
+            return
+
+        blocked = await self.sender_blocked_peer()
 
         if blocked:
             await self.send(
@@ -521,21 +515,28 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     {
                         "type": "error",
                         "message": (
-                            "You cannot send messages "
-                            "to this user."
+                            "Unblock this contact to send a message."
                         ),
                     }
                 )
             )
             return
-                    
 
-
-        message = await self.save_message(
-            content=content,
-            message_type=message_type,
-            reply_to=reply_to,
-        )
+        try:
+            message = await self.save_message(
+                content=content,
+                message_type=message_type,
+                reply_to=reply_to,
+                mentions=data.get("mentions"),
+            )
+        except ValidationError as error:
+            detail = error.detail
+            if isinstance(detail, dict):
+                detail = next(iter(detail.values()), "Invalid message.")
+            if isinstance(detail, list):
+                detail = detail[0] if detail else "Invalid message."
+            await self.send_error(str(detail))
+            return
 
         await self.broadcast_message(
             message,
@@ -546,6 +547,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
         self,
         event,
     ):
+
+        if self.user.id in (event.get("hidden_for") or ()):
+            return
 
         await self.send(
             text_data=json.dumps(
@@ -562,25 +566,38 @@ class ChatConsumer(AsyncWebsocketConsumer):
     message,
     ):
         """
-        Broadcast a newly created message.
+        Broadcast a newly created message (same path as the REST views, so
+        block rules, receipts and inbox updates are identical).
         """
 
-        serializer = await database_sync_to_async(
-            lambda: MessageSerializer(
-                message,
-                context={
-                    "request": None,
-                },
-            ).data
-        )()
+        await database_sync_to_async(broadcast_message_everywhere)(message)
 
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                "type": "chat.message",
-                "message": serializer,
-            },
+    @database_sync_to_async
+    def get_presence_snapshot(self):
+        profiles = (
+            Profile.objects.filter(
+                user__chat_participations__room_id=self.room_id,
+                user__is_deleted=False,
+            )
+            .exclude(user_id=self.user.id)
+            .exclude(user_id__in=blocked_user_ids(self.user.id))
         )
+        viewer = type(self.user).objects.select_related("profile").get(pk=self.user.id)
+        # Privacy settings (last seen / online, with reciprocity) per viewer.
+        return presence_snapshot_for(viewer, [
+            {
+                "user_id": profile.user_id,
+                "profile": profile,
+                "is_online": bool(profile.is_online),
+                "last_seen": None if profile.is_online or not profile.last_seen else profile.last_seen.isoformat(),
+            }
+            for profile in profiles
+        ])
+
+    @database_sync_to_async
+    def get_other_participant_ids(self):
+        return list(Participant.objects.filter(room_id=self.room_id)
+                    .exclude(user_id=self.user.id).values_list("user_id", flat=True))
 
     async def presence_update(
         self,
@@ -590,13 +607,19 @@ class ChatConsumer(AsyncWebsocketConsumer):
         Broadcast a user's online/offline status.
         """
 
+        if event.get("user_id") in await self.blocked_ids():
+            return
+        is_online, last_seen = await database_sync_to_async(presence_for_viewer)(
+            event["user_id"], self.user.id, bool(event.get("is_online")), event.get("last_seen"),
+        )
+
         await self.send(
             text_data=json.dumps(
                 {
                     "type": "presence",
                     "user_id": event["user_id"],
-                    "is_online": event["is_online"],
-                    "last_seen": event["last_seen"],
+                    "is_online": is_online,
+                    "last_seen": last_seen,
                 }
             )
         )
@@ -605,6 +628,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def broadcast_presence(
         self,
         is_online: bool,
+        last_seen: str | None = None,
     ) -> None:
         """
         Broadcast the user's online/offline status
@@ -617,11 +641,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 "type": "presence.update",
                 "user_id": self.user.id,
                 "is_online": is_online,
-                "last_seen": (
-                    None
-                    if is_online
-                    else timezone.now().isoformat()
-                ),
+                "last_seen": None if is_online else (last_seen or timezone.now().isoformat()),
             },
         )
 
@@ -630,7 +650,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
         is_typing: bool,
     ) -> None:
         """
-        Broadcast typing status to the room.
+        Broadcast typing status to the room and to the other participants'
+        inboxes, so "typing…" also appears in their chat lists.
         """
 
         await self.channel_layer.group_send(
@@ -642,11 +663,22 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 "is_typing": is_typing,
             },
         )
+        for recipient_id in await self.get_other_participant_ids():
+            await self.channel_layer.group_send(
+                f"chat_inbox_{recipient_id}",
+                {
+                    "type": "inbox.typing",
+                    "room_id": int(self.room_id),
+                    "user_id": self.user.id,
+                    "is_typing": is_typing,
+                },
+            )
 
     async def broadcast_delivered(
         self,
         message_id: int,
         sender_id: int,
+        receipt_state: dict | None = None,
     ) -> None:
         """
         Broadcast that a message has been delivered.
@@ -658,7 +690,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 "type": "message.delivered",
                 "message_id": message_id,
                 "sender_id": sender_id,
+                "is_delivered": bool((receipt_state or {}).get("is_delivered", True)),
+                "is_read": bool((receipt_state or {}).get("is_read", False)),
             },
+        )
+        await self.channel_layer.group_send(
+            f"chat_inbox_{sender_id}",
+            {"type": "inbox.receipt", "room_id": int(self.room_id), "message_id": message_id, "receipt": "delivered",
+             "is_delivered": bool((receipt_state or {}).get("is_delivered", True)),
+             "is_read": bool((receipt_state or {}).get("is_read", False))},
         )
 
 
@@ -666,6 +706,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         self,
         message_id: int,
         sender_id: int,
+        receipt_state: dict | None = None,
     ) -> None:
         """
         Broadcast that a message has been read.
@@ -677,7 +718,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 "type": "message.read",
                 "message_id": message_id,
                 "sender_id": sender_id,
+                "is_delivered": bool((receipt_state or {}).get("is_delivered", True)),
+                "is_read": bool((receipt_state or {}).get("is_read", True)),
             },
+        )
+        await self.channel_layer.group_send(
+            f"chat_inbox_{sender_id}",
+            {"type": "inbox.receipt", "room_id": int(self.room_id), "message_id": message_id, "receipt": "read",
+             "is_delivered": bool((receipt_state or {}).get("is_delivered", True)),
+             "is_read": bool((receipt_state or {}).get("is_read", True))},
         )
 
 
@@ -800,6 +849,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 {
                     "type": "delivered",
                     "message_id": event["message_id"],
+                    "is_delivered": bool(event.get("is_delivered", True)),
+                    "is_read": bool(event.get("is_read", False)),
                 }
             )
         )
@@ -822,6 +873,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 {
                     "type": "read",
                     "message_id": event["message_id"],
+                    "is_delivered": bool(event.get("is_delivered", True)),
+                    "is_read": bool(event.get("is_read", True)),
                 }
             )
         )
@@ -889,6 +942,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
 
     
+    async def message_patch(self, event: dict) -> None:
+        """Partial message update (poll votes, view once opened...)."""
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "patch",
+                    "message_id": event["message_id"],
+                    "patch": event["patch"],
+                }
+            )
+        )
+
     async def message_pinned(
         self,
         event: dict,
@@ -915,13 +980,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
         content,
         message_type,
         reply_to,
+        mentions=None,
     ):
+        from .features import save_mentions, validate_mentions
+        from .link_preview import extract_first_url, get_link_preview
 
         room = ChatRoom.objects.only(
             "id",
+            "room_type",
         ).get(
             pk=self.room_id,
         )
+        mention_ids = validate_mentions(room, mentions)
 
         reply_message = None
 
@@ -938,7 +1008,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
             content=content,
             message_type=message_type,
             reply_to=reply_message,
+            # Only a cached preview here: never block the socket on the network.
+            link_preview=(
+                get_link_preview(extract_first_url(content), use_network=False)
+                if message_type == MessageType.TEXT
+                else None
+            ),
         )
+        save_mentions(message, mention_ids)
 
         return (
             Message.objects
@@ -986,7 +1063,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         emoji: str,
     ):
         """
-        Create or update a reaction.
+        Create, update or (with an empty emoji) remove a reaction.
         """
 
         try:
@@ -998,6 +1075,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
         except Message.DoesNotExist:
             return None
 
+        if not emoji:
+            Reaction.objects.filter(message=message, user=self.user).delete()
+            return True
+
         reaction, _ = Reaction.objects.update_or_create(
             message=message,
             user=self.user,
@@ -1007,7 +1088,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
 
         return reaction
-    
+
     @database_sync_to_async
     def pin_message(
         self,
@@ -1018,11 +1099,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
         Pin or unpin a message.
         """
 
+        from .group_events import GROUP_EVENT_PREFIX
+
         updated = Message.objects.filter(
             id=message_id,
             room_id=self.room_id,
             is_deleted=False,
-        ).update(
+        ).exclude(content__startswith=GROUP_EVENT_PREFIX).update(
             is_pinned=is_pinned,
             pinned_at=(
                 timezone.now()
@@ -1042,6 +1125,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         """
         Forward an existing message.
         """
+        from .group_events import GROUP_EVENT_PREFIX
 
         try:
             original = (
@@ -1061,6 +1145,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "reactions",
                      "voice_note",
                 )
+                .exclude(content__startswith=GROUP_EVENT_PREFIX)
                 .get(
                     id=message_id,
                     room_id=self.room_id,
@@ -1070,13 +1155,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
         except Message.DoesNotExist:
             return None
 
+        if original.is_view_once or original.is_system:
+            return None
+
         message = Message.objects.create(
             room_id=self.room_id,
             sender=self.user,
             message_type=original.message_type,
             content=original.content,
+            link_preview=original.link_preview,
             forwarded_from=original,
         )
+
+        from .features import copy_poll
+
+        copy_poll(original, message)
 
         # Copy attachments
         for attachment in original.attachments.all():
@@ -1123,24 +1216,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def mark_message_delivered(
         self,
         message_id: int,
-    ) -> int:
+    ) -> dict | None:
         """
         Mark a message as delivered.
         """
 
-        updated = Message.objects.filter(
-            id=message_id,
-            room_id=self.room_id,
-            is_delivered=False,
-            is_deleted=False,   # <-- Add this line
-        ).exclude(
-            sender=self.user,
-        ).update(
-            is_delivered=True,
-            delivered_at=timezone.now(),
-        )
-
-        return updated
+        message = Message.objects.filter(pk=message_id, room_id=self.room_id, is_deleted=False).first()
+        if message is None or message.sender_id == self.user.id:
+            return None
+        result = persist_message_receipt(message_id, self.user.id, "delivered")
+        if result:
+            result["sender_id"] = message.sender_id
+        return result
     
         
     
@@ -1148,24 +1235,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def mark_message_read(
         self,
         message_id: int,
-    ) -> int:
-        """
-        Mark a message as read.
-        """
+    ) -> dict | None:
+        """Mark an incoming message read; read necessarily implies delivery."""
+        message = Message.objects.filter(pk=message_id, room_id=self.room_id, is_deleted=False).first()
+        if message is None or message.sender_id == self.user.id:
+            return None
+        result = persist_message_receipt(message_id, self.user.id, "read")
+        if result:
+            result = mask_receipt_results([result])[0]
+            result["sender_id"] = message.sender_id
+        return result
 
-        updated = Message.objects.filter(
-            id=message_id,
-            room_id=self.room_id,
-            is_read=False,
-            is_deleted=False,
-        ).exclude(
-            sender=self.user,
-        ).update(
-            is_read=True,
-            read_at=timezone.now(),
-        )
-
-        return updated
 
 
     @database_sync_to_async
@@ -1175,44 +1255,52 @@ class ChatConsumer(AsyncWebsocketConsumer):
         content: str,
     ) -> int:
         """
-        Edit a message.
+        Edit a text message within the edit window.
         """
+        from .views import edit_window_open
 
-        updated = Message.objects.filter(
+        message = Message.objects.filter(
             id=message_id,
             room_id=self.room_id,
             sender=self.user,
             is_deleted=False,
-        ).update(
+            message_type=MessageType.TEXT,
+        ).first()
+        if message is None or str(message.content or "").startswith("__WHATSUP_"):
+            return 0
+        if not edit_window_open(message):
+            return 0
+
+        return Message.objects.filter(pk=message.pk).update(
             content=content,
             is_edited=True,
             updated_at=timezone.now(),
         )
 
-        return updated
-    
     @database_sync_to_async
     def delete_message(
         self,
         message_id: int,
     ) -> int:
         """
-        Soft delete a message.
+        Delete a message for everyone (sender only, within the time window).
+        Media, reactions and stars are removed; a tombstone is kept.
         """
+        from .views import delete_for_everyone_window_open
+        from .utils import soft_delete_messages_for_everyone
 
-        updated = Message.objects.filter(
+        from .group_events import GROUP_EVENT_PREFIX
+
+        message = Message.objects.filter(
             id=message_id,
             room_id=self.room_id,
             sender=self.user,
             is_deleted=False,
-        ).update(
-            is_deleted=True,
-            is_edited=False,
-            content="",
-            updated_at=timezone.now(),
-        )
-        return updated
-
+        ).exclude(content__startswith=GROUP_EVENT_PREFIX).first()
+        if message is None or not delete_for_everyone_window_open(message):
+            return 0
+        # soft_delete_messages_for_everyone broadcasts the deletion itself.
+        return len(soft_delete_messages_for_everyone([message]))
 
     @database_sync_to_async
     def get_message_sender_id(
@@ -1246,17 +1334,28 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
 
     @database_sync_to_async
-    def set_user_offline(self) -> None:
-        """
-        Mark the user as offline.
-        """
-
-        Profile.objects.filter(
-            user_id=self.user.id,
-        ).update(
+    def set_user_offline(self):
+        """Persist offline status and return the saved last-seen timestamp."""
+        last_seen = timezone.now()
+        Profile.objects.filter(user_id=self.user.id).update(
             is_online=False,
-            last_seen=timezone.now(),
+            last_seen=last_seen,
         )
+        return last_seen.isoformat()
+
+    @database_sync_to_async
+    def send_denied_reason(self):
+        """Group "only admins can send", deleted peer, … (None when allowed)."""
+        return send_message_error(self.user, self.room_id)
+
+    @database_sync_to_async
+    def sender_blocked_peer(self):
+        room = ChatRoom.objects.filter(pk=self.room_id).first()
+        return bool(room) and sender_has_blocked_peer(room, self.user)
+
+    @database_sync_to_async
+    def blocked_ids(self):
+        return blocked_user_ids(self.user.id)
 
     @database_sync_to_async
     def is_private_chat_blocked(
@@ -1319,3 +1418,264 @@ class ChatConsumer(AsyncWebsocketConsumer):
             participants__user=self.user,
             is_active=True,
         ).exists()
+
+    
+
+class ChatInboxConsumer(AsyncWebsocketConsumer):
+    """
+    Per-user inbox socket (one per open tab/device).
+
+    Delivers new messages, receipts, typing and presence for every chat so
+    the sidebar stays live, plus nudges (room/contacts/profile/status/call
+    changes) that tell the client to re-sync that slice over REST. It also
+    owns the user's online state: the profile counts live connections and is
+    only marked offline when the last tab disconnects.
+    """
+
+    @staticmethod
+    def parse_positive_id(value):
+        if isinstance(value, bool):
+            return None
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        return parsed if parsed > 0 else None
+
+    async def connect(self):
+        self.user = self.scope["user"]
+        if self.user.is_anonymous:
+            await self.close(code=UNAUTHORIZED)
+            return
+        self.inbox_group_name = f"chat_inbox_{self.user.id}"
+        await self.channel_layer.group_add(self.inbox_group_name, self.channel_name)
+        await self.accept()
+        became_online = await self.register_connection()
+        if became_online:
+            await self.broadcast_presence(True)
+        # Messages that arrived while this user was offline are now on a
+        # device: mark them delivered (grey double tick) for their senders.
+        await self.deliver_pending_messages()
+
+    async def disconnect(self, close_code):
+        if not hasattr(self, "inbox_group_name"):
+            return
+        await self.channel_layer.group_discard(self.inbox_group_name, self.channel_name)
+        last_seen = await self.unregister_connection()
+        if last_seen:
+            await self.broadcast_presence(False, last_seen=last_seen)
+
+    async def receive(self, text_data):
+        try:
+            data = json.loads(text_data)
+        except (json.JSONDecodeError, TypeError):
+            return
+        if not isinstance(data, dict):
+            return
+        if data.get("type") == "ping":
+            await self.send(text_data=json.dumps({"type": "pong"}))
+            return
+        if data.get("type") not in {"delivered", "read"}:
+            return
+        message_id = self.parse_positive_id(data.get("message_id"))
+        room_id = self.parse_positive_id(data.get("room_id"))
+        if not message_id or not room_id:
+            return
+        receipt = "read" if data.get("type") == "read" else "delivered"
+        message_info = await self.record_receipt(message_id, room_id, receipt)
+        if not message_info:
+            return
+        sender_id = message_info["sender_id"]
+        receipt = message_info.get("receipt", receipt)
+        handler_type = "message.read" if receipt == "read" else "message.delivered"
+        await self.channel_layer.group_send(
+            f"chat_{room_id}",
+            {"type": handler_type, "message_id": message_id, "sender_id": sender_id,
+             "is_delivered": message_info["is_delivered"], "is_read": message_info["is_read"]},
+        )
+        await self.channel_layer.group_send(
+            f"chat_inbox_{sender_id}",
+            {"type": "inbox.receipt", "room_id": room_id, "message_id": message_id, "receipt": receipt,
+             "is_delivered": message_info["is_delivered"], "is_read": message_info["is_read"]},
+        )
+
+    # -- events pushed to the client ----------------------------------------
+    async def inbox_message(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "inbox.message",
+            "room_id": event["room_id"],
+            "message": event["message"],
+        }))
+
+    async def inbox_message_patch(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "message.patch",
+            "room_id": event["room_id"],
+            "message_id": event["message_id"],
+            "patch": event["patch"],
+        }))
+
+    async def inbox_room_changed(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "room.updated",
+            "room_id": event.get("room_id"),
+            "action": event.get("action", "updated"),
+        }))
+
+    async def inbox_receipt(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "receipt",
+            "room_id": event["room_id"],
+            "message_id": event["message_id"],
+            "receipt": event["receipt"],
+            "is_delivered": bool(event.get("is_delivered", True)),
+            "is_read": bool(event.get("is_read", False)),
+        }))
+
+    async def inbox_typing(self, event):
+        if event.get("user_id") == self.user.id:
+            return
+        await self.send(text_data=json.dumps({
+            "type": "typing",
+            "room_id": event["room_id"],
+            "user_id": event["user_id"],
+            "is_typing": bool(event.get("is_typing")),
+        }))
+
+    async def inbox_presence(self, event):
+        # Blocked (either way): never reveal online / last seen.
+        if event.get("user_id") in await database_sync_to_async(blocked_user_ids)(self.user.id):
+            return
+        # Last seen & online privacy (with reciprocity) for this viewer.
+        is_online, last_seen = await database_sync_to_async(presence_for_viewer)(
+            event["user_id"], self.user.id, bool(event.get("is_online")), event.get("last_seen"),
+        )
+        await self.send(text_data=json.dumps({
+            "type": "presence",
+            "user_id": event["user_id"],
+            "is_online": is_online,
+            "last_seen": last_seen,
+        }))
+
+    async def inbox_account_deleted(self, event):
+        # The account was deleted (possibly from another tab): sign out.
+        await self.send(text_data=json.dumps({"type": "account.deleted"}))
+        await self.close(code=UNAUTHORIZED)
+
+    async def inbox_profile_changed(self, event):
+        await self.send(text_data=json.dumps({"type": "profile.updated", "user_id": event.get("user_id")}))
+
+    async def inbox_contacts_changed(self, event):
+        await self.send(text_data=json.dumps({"type": "contacts.updated"}))
+
+    async def inbox_status_changed(self, event):
+        payload = {key: value for key, value in event.items() if key != "type"}
+        await self.send(text_data=json.dumps({"type": "status.updated", **payload}))
+
+    async def inbox_call_changed(self, event):
+        payload = {key: value for key, value in event.items() if key != "type"}
+        await self.send(text_data=json.dumps({"type": "calls.updated", **payload}))
+
+    # Room-level presence events may also be routed here; reuse the handler.
+    async def presence_update(self, event):
+        await self.inbox_presence(event)
+
+    # -- database helpers ---------------------------------------------------
+    @database_sync_to_async
+    def record_receipt(self, message_id, room_id, receipt):
+        message = Message.objects.filter(
+            pk=message_id,
+            room_id=room_id,
+            room__participants__user_id=self.user.id,
+            is_deleted=False,
+        ).exclude(sender_id=self.user.id).first()
+        if message is None:
+            return None
+        if not Participant.objects.filter(room_id=room_id, user_id=self.user.id).exists():
+            return None
+        result = persist_message_receipt(message_id, self.user.id, receipt)
+        if not result:
+            return None
+        # Read receipts off in this private chat: the sender only sees grey ticks.
+        result = mask_receipt_results([result])[0]
+        return {"sender_id": message.sender_id, "room_id": room_id, "receipt": result["receipt"],
+                "is_delivered": result["is_delivered"], "is_read": result["is_read"]}
+
+    @database_sync_to_async
+    def deliver_pending_messages(self):
+        from .utils import broadcast_receipts
+
+        pending_ids = list(
+            MessageReceipt.objects.filter(
+                recipient_id=self.user.id,
+                delivered_at__isnull=True,
+                message__is_deleted=False,
+            ).exclude(message__deleted_for_users__user_id=self.user.id)
+            .values_list("message_id", flat=True)[:500]
+        )
+        results = persist_receipts_bulk(pending_ids, self.user.id, "delivered")
+        broadcast_receipts(results)
+        return len(results)
+
+    @database_sync_to_async
+    def register_connection(self):
+        """Count this tab; return True when the user just came online."""
+        from django.db.models import F
+
+        Profile.objects.filter(user_id=self.user.id).update(
+            active_connections=F("active_connections") + 1,
+            is_online=True,
+        )
+        count = Profile.objects.filter(user_id=self.user.id).values_list("active_connections", flat=True).first()
+        return count == 1
+
+    @database_sync_to_async
+    def unregister_connection(self):
+        """Uncount this tab; return the last-seen ISO time if the user went offline."""
+        from django.db import transaction
+        from django.db.models import F
+        from django.db.models.functions import Greatest
+
+        with transaction.atomic():
+            Profile.objects.filter(user_id=self.user.id).update(
+                active_connections=Greatest(F("active_connections") - 1, 0),
+            )
+            remaining = Profile.objects.filter(user_id=self.user.id).values_list(
+                "active_connections", flat=True
+            ).first()
+            if remaining:
+                return None
+            last_seen = timezone.now()
+            Profile.objects.filter(user_id=self.user.id, active_connections=0).update(
+                is_online=False,
+                last_seen=last_seen,
+            )
+        return last_seen.isoformat()
+
+    @database_sync_to_async
+    def get_contact_user_ids(self):
+        room_ids = Participant.objects.filter(user_id=self.user.id).values_list("room_id", flat=True)
+        return list(
+            Participant.objects.filter(room_id__in=room_ids)
+            .exclude(user_id=self.user.id)
+            .values_list("user_id", flat=True)
+            .distinct()
+        )
+
+    @database_sync_to_async
+    def get_participating_room_ids(self):
+        return list(Participant.objects.filter(user_id=self.user.id).values_list("room_id", flat=True))
+
+    async def broadcast_presence(self, is_online, last_seen=None):
+        payload = {
+            "type": "presence.update",
+            "user_id": self.user.id,
+            "is_online": is_online,
+            "last_seen": None if is_online else (last_seen or timezone.now().isoformat()),
+        }
+        # Open conversations (room sockets) and every contact's chat list.
+        for room_id in await self.get_participating_room_ids():
+            await self.channel_layer.group_send(f"chat_{room_id}", payload)
+        inbox_payload = {**payload, "type": "inbox.presence"}
+        for user_id in await self.get_contact_user_ids():
+            await self.channel_layer.group_send(f"chat_inbox_{user_id}", inbox_payload)

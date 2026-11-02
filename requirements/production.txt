@@ -1,3 +1,8 @@
 -r base.txt
 
-gunicorn
+# Bounded PostgreSQL connection pool (Django OPTIONS['pool']).
+psycopg-pool==3.3.3
+# ASGI server with multiple worker processes (HTTP + WebSockets).
+uvicorn[standard]==0.54.0
+# Optional S3-compatible media storage (Cloudflare R2, Backblaze B2, AWS S3).
+django-storages[s3]==1.14.6

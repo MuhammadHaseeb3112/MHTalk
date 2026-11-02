@@ -1,0 +1,259 @@
+/*
+ * Design tokens — WhatsApp Web (2025 dark redesign) inspired palette.
+ * Neutral near-black surfaces, green accent, dark-green outgoing bubbles.
+ *
+ * Full-screen media surfaces (call screen, status viewer/composer, camera)
+ * stay dark in the light theme too, like WhatsApp, so they re-declare the
+ * dark tokens for everything inside them.
+ */
+:root,
+:root[data-theme="light"] :is(.call-screen, .status-viewer, .status-composer, .camera) {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --app-bg: #0c0c0c;
+  --rail-bg: #1d1f1f;
+  --panel-bg: #161717;
+  --panel-raised: #1d1f1f;
+  --chat-bg: #161717;
+  --header-bg: #161717;
+  --input-bg: #2e2f2f;
+  --hover-bg: #2e2f2f;
+  --active-bg: #2e2f2f;
+  --selected-bg: #3b3c3c;
+  --menu-bg: #1d1f1f;
+  --modal-bg: #1d1f1f;
+  --overlay: rgba(0, 0, 0, 0.62);
+  --doodle: rgba(255, 255, 255, 0.045);
+
+  /* Lines */
+  --divider: #2a2c2c;
+  --divider-strong: #3b3c3c;
+  --chip-border: #3b3c3c;
+
+  /* Text */
+  --text: #e9edef;
+  --text-strong: #ffffff;
+  --text-secondary: #a5a5a5;
+  --text-muted: #8696a0;
+  --icon: #aebac1;
+  --icon-strong: #e9edef;
+
+  /* Brand */
+  --accent: #21c063;
+  --accent-strong: #1daa61;
+  --accent-soft: #103529;
+  --accent-text: #d9fdd3;
+  --badge-text: #0b141a;
+  --danger: #f15c6d;
+  --danger-soft: rgba(241, 92, 109, 0.12);
+  --blue-tick: #53bdeb;
+  --link: #53bdeb;
+  --warning: #ffd279;
+
+  /* Bubbles */
+  --bubble-out: #144d37;
+  --bubble-out-meta: rgba(233, 237, 239, 0.62);
+  --bubble-in: #242626;
+  --bubble-in-meta: rgba(233, 237, 239, 0.55);
+  --quote-out: #0d3a29;
+  --quote-in: #1d1f1f;
+  --system-bubble: #1d1f1f;
+
+  /* Avatars */
+  --avatar-bg: #2b2d42;
+  --avatar-fg: #a7a2ff;
+  --avatar-initials: #d8d6ff;
+  --ring-seen: #5b6366;
+
+  /* Misc. surfaces that used to be hard-coded */
+  --badge-bg: var(--accent);
+  --scrollbar: rgba(255, 255, 255, 0.16);
+  --tooltip-bg: #f0f2f5;
+  --tooltip-text: #111b21;
+  --toast-bg: #e9edef;
+  --toast-text: #111b21;
+  --toast-action: #008069;
+  --toggle-knob: #cfd4d6;
+  --press-bg: rgba(255, 255, 255, 0.08);
+  --soft-fill: rgba(255, 255, 255, 0.1);
+  --soft-fill-hover: rgba(255, 255, 255, 0.05);
+  --hairline: rgba(255, 255, 255, 0.1);
+  --quote-bg: rgba(0, 0, 0, 0.2);
+  --doc-bg: rgba(0, 0, 0, 0.18);
+  --doc-bg-hover: rgba(0, 0, 0, 0.3);
+  --poll-track: rgba(255, 255, 255, 0.12);
+  --map-bg: #2a3b38;
+  --emoji-meta-bg: rgba(0, 0, 0, 0.35);
+  --viewer-bg: rgba(12, 12, 12, 0.97);
+  --viewer-nav-bg: rgba(255, 255, 255, 0.08);
+  --viewer-nav-hover: rgba(255, 255, 255, 0.16);
+  --viewer-nav-fg: #ffffff;
+  --side-btn-bg: rgba(0, 0, 0, 0.35);
+  --side-btn-hover: rgba(0, 0, 0, 0.55);
+  --code-bg: rgba(0, 0, 0, 0.25);
+  --unread-band: rgba(0, 0, 0, 0.18);
+  --selected-row: rgba(33, 192, 99, 0.07);
+  --reaction-mine: #1b3a2c;
+  --system-text: #ffd279;
+  --banner-warn-bg: #3b2f12;
+  --banner-warn-text: #ffd279;
+  --warning-soft: rgba(255, 210, 121, 0.12);
+  --drop-zone-bg: rgba(22, 23, 23, 0.86);
+  --audio-wave: rgba(233, 237, 239, 0.35);
+  --audio-wave-out: #7dd3a8;
+  --shadow-float: 0 2px 10px rgba(0, 0, 0, 0.45);
+
+  /* Group sender names (WhatsApp palette, tuned per theme) */
+  --sender-0: #06cf9c;
+  --sender-1: #25d366;
+  --sender-2: #53bdeb;
+  --sender-3: #ffd279;
+  --sender-4: #ff72a1;
+  --sender-5: #a5b337;
+  --sender-6: #e542a3;
+  --sender-7: #fc9775;
+  --sender-8: #7f66ff;
+  --sender-9: #00a884;
+
+  /* Shape */
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+  --shadow-menu: 0 8px 28px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --shadow-bubble: 0 1px 0.5px rgba(0, 0, 0, 0.25);
+
+  /* Layout */
+  --rail-width: 64px;
+  /* WhatsApp Web: the chat list takes about 40% of the window */
+  --sidebar-width: 40%;
+  --sidebar-min: 340px;
+  --sidebar-max: 640px;
+  --header-height: 64px;
+  --drawer-width: 30%;
+
+  /* Type */
+  --font: "Segoe UI", "Helvetica Neue", Helvetica, "Lucida Grande", Arial, Ubuntu, Cantarell, "Fira Sans", sans-serif;
+  --font-emoji: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 14.2px;
+  --fs-lg: 16px;
+  --fs-xl: 19px;
+}
+
+/*
+ * Light theme — WhatsApp Web light palette. Applied with
+ * <html data-theme="light"> (set before React renders, see index.html and
+ * services/theme.js). Dark above stays the default.
+ */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* Surfaces */
+  --app-bg: #eae6df;
+  --rail-bg: #f0f2f5;
+  --panel-bg: #ffffff;
+  --panel-raised: #ffffff;
+  --chat-bg: #efeae2;
+  --header-bg: #f0f2f5;
+  --input-bg: #f0f2f5;
+  --hover-bg: #f5f6f6;
+  --active-bg: #f0f2f5;
+  --selected-bg: #e9edef;
+  --menu-bg: #ffffff;
+  --modal-bg: #ffffff;
+  --overlay: rgba(11, 20, 26, 0.45);
+  --doodle: rgba(0, 0, 0, 0.06);
+
+  /* Lines */
+  --divider: #e9edef;
+  --divider-strong: #d1d7db;
+  --chip-border: #d1d7db;
+
+  /* Text */
+  --text: #111b21;
+  --text-strong: #111b21;
+  --text-secondary: #54656f;
+  --text-muted: #667781;
+  --icon: #54656f;
+  --icon-strong: #3b4a54;
+
+  /* Brand */
+  --accent: #008069;
+  --accent-strong: #017561;
+  --accent-soft: #d9fdd3;
+  --accent-text: #008069;
+  --badge-text: #ffffff;
+  --badge-bg: #25d366;
+  --danger: #ea0038;
+  --danger-soft: rgba(234, 0, 56, 0.08);
+  --blue-tick: #53bdeb;
+  --link: #027eb5;
+  --warning: #8a6d00;
+
+  /* Bubbles */
+  --bubble-out: #d9fdd3;
+  --bubble-out-meta: rgba(17, 27, 33, 0.5);
+  --bubble-in: #ffffff;
+  --bubble-in-meta: rgba(17, 27, 33, 0.5);
+  --quote-out: #d1f4cc;
+  --quote-in: #f5f6f6;
+  --system-bubble: #ffffff;
+
+  /* Avatars */
+  --avatar-bg: #dfe5e7;
+  --avatar-fg: #ffffff;
+  --avatar-initials: #54656f;
+  --ring-seen: #bfc6ca;
+
+  --scrollbar: rgba(11, 20, 26, 0.2);
+  --tooltip-bg: #3b4a54;
+  --tooltip-text: #ffffff;
+  --toast-bg: #3b4a54;
+  --toast-text: #ffffff;
+  --toast-action: #25d366;
+  --toggle-knob: #ffffff;
+  --press-bg: rgba(11, 20, 26, 0.06);
+  --soft-fill: rgba(11, 20, 26, 0.06);
+  --soft-fill-hover: rgba(11, 20, 26, 0.04);
+  --hairline: rgba(11, 20, 26, 0.1);
+  --quote-bg: rgba(11, 20, 26, 0.05);
+  --doc-bg: rgba(11, 20, 26, 0.05);
+  --doc-bg-hover: rgba(11, 20, 26, 0.09);
+  --poll-track: rgba(11, 20, 26, 0.12);
+  --map-bg: #e3ebe8;
+  --emoji-meta-bg: rgba(255, 255, 255, 0.9);
+  --viewer-bg: rgba(255, 255, 255, 0.97);
+  --viewer-nav-bg: #ffffff;
+  --viewer-nav-hover: #f0f2f5;
+  --viewer-nav-fg: #54656f;
+  --side-btn-bg: rgba(255, 255, 255, 0.92);
+  --side-btn-hover: #ffffff;
+  --code-bg: rgba(11, 20, 26, 0.07);
+  --unread-band: rgba(255, 255, 255, 0.35);
+  --selected-row: rgba(0, 128, 105, 0.08);
+  --reaction-mine: #d9fdd3;
+  --system-text: #54656f;
+  --banner-warn-bg: #fff3c4;
+  --banner-warn-text: #5c4600;
+  --warning-soft: #fff3c4;
+  --drop-zone-bg: rgba(240, 242, 245, 0.92);
+  --audio-wave: rgba(17, 27, 33, 0.25);
+  --audio-wave-out: #25a36f;
+  --shadow-menu: 0 2px 5px rgba(11, 20, 26, 0.26), 0 2px 10px rgba(11, 20, 26, 0.16);
+  --shadow-bubble: 0 1px 0.5px rgba(11, 20, 26, 0.13);
+  --shadow-float: 0 1px 3px rgba(11, 20, 26, 0.3);
+
+  --sender-0: #029d7a;
+  --sender-1: #1f9e4a;
+  --sender-2: #027eb5;
+  --sender-3: #b4790b;
+  --sender-4: #d42a66;
+  --sender-5: #6b7a00;
+  --sender-6: #b4247f;
+  --sender-7: #c4532d;
+  --sender-8: #5e47de;
+  --sender-9: #008069;
+}

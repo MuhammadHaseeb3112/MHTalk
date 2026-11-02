@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MHTalk</title>
+  <meta name="description" content="MHTalk — simple, real-time messaging, voice and video calls." />
+  <!-- Apply the saved light/dark theme before anything paints (no flash). -->
+  <script>
+    (function () {
+      var pref = "system";
+      try { pref = localStorage.getItem("whatsup_theme") || "system"; } catch (e) { /* private mode */ }
+      var light = pref === "light" || (pref !== "dark" && window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches);
+      var theme = light ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", theme);
+      document.documentElement.style.colorScheme = theme;
+      var meta = document.createElement("meta");
+      meta.name = "theme-color";
+      meta.content = light ? "#f0f2f5" : "#161717";
+      document.head.appendChild(meta);
+    })();
+  </script>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192.png" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="MHTalk" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="application-name" content="MHTalk" />
+</head>
+
+<body>
+
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+
+</body>
+
+</html>

@@ -1,0 +1,488 @@
+/* App shell: rail | sidebar | main | (drawer) */
+.app {
+  display: flex;
+  height: 100%;
+  height: 100dvh;
+  width: 100%;
+  overflow: hidden;
+  background: var(--panel-bg);
+}
+
+/* ---------------------------------------------------------------- rail */
+.rail {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: var(--rail-width);
+  flex: none;
+  padding: 10px 0 14px;
+  background: var(--rail-bg);
+  border-right: 1px solid var(--divider);
+  z-index: 5;
+}
+.rail__group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.rail__group--bottom {
+  gap: 10px;
+}
+.rail__group--bottom::before {
+  content: "";
+  width: 32px;
+  height: 1px;
+  margin-bottom: 4px;
+  background: var(--divider-strong);
+}
+.rail__btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--icon);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.rail__btn:hover {
+  background: var(--hover-bg);
+}
+.rail__btn.is-active {
+  background: var(--hover-bg);
+  color: var(--icon-strong);
+}
+.rail__btn--avatar.is-active {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.rail__badge {
+  position: absolute;
+  top: 2px;
+  right: -2px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: var(--badge-bg);
+  color: var(--badge-text);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 19px;
+  text-align: center;
+}
+.rail__dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--rail-bg);
+}
+.rail__label {
+  display: none;
+}
+
+/* ---------------------------------------------------------------- sidebar */
+.sidebar {
+  position: relative;
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-min);
+  max-width: var(--sidebar-max);
+  flex: none;
+  border-right: 1px solid var(--divider);
+  background: var(--panel-bg);
+}
+.sidebar__stack {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+.sidebar__stack > .panel {
+  position: absolute;
+  inset: 0;
+}
+.sidebar__overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: var(--panel-bg);
+  animation: slide-in-left 0.2s ease-out;
+}
+@keyframes slide-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+/* ---------------------------------------------------------------- main */
+.main {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--chat-bg);
+}
+
+/* ---------------------------------------------------------------- drawer */
+.drawer {
+  width: var(--drawer-width);
+  min-width: 340px;
+  max-width: 460px;
+  flex: none;
+  border-left: 1px solid var(--divider);
+  background: var(--panel-bg);
+  animation: slide-in-right 0.2s ease-out;
+  overflow: hidden;
+}
+@keyframes slide-in-right {
+  from {
+    transform: translateX(40px);
+    opacity: 0;
+  }
+}
+
+/* ---------------------------------------------------------------- intro */
+.intro {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 34px;
+  padding: 24px;
+  text-align: center;
+  border-bottom: 6px solid var(--accent);
+}
+.intro__card {
+  max-width: 460px;
+  padding: 36px 32px 32px;
+  border-radius: 24px;
+  background: var(--panel-raised);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.intro__card h2 {
+  margin: 22px 0 8px;
+  font-size: 30px;
+  font-weight: 300;
+  color: var(--text-strong);
+}
+.intro__card p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+.intro__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 18px;
+}
+.intro__actions button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 110px;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+}
+.intro__actions button span {
+  display: grid;
+  place-items: center;
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: var(--panel-raised);
+  color: var(--icon-strong);
+  transition: background-color 0.15s ease;
+}
+.intro__actions button:hover span {
+  background: var(--hover-bg);
+}
+
+/* With an info drawer open the list narrows (as in WhatsApp Web) so the
+   conversation keeps a comfortable width. */
+.app.has-drawer .sidebar {
+  width: 30%;
+}
+
+/* ---------------------------------------------------------------- responsive */
+@media (max-width: 1280px) {
+  .app.has-drawer .sidebar {
+    min-width: 300px;
+  }
+  .drawer {
+    min-width: 320px;
+  }
+}
+
+@media (max-width: 1100px) {
+  /* Drawer floats over the conversation on medium screens */
+  .drawer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    width: min(420px, 100%);
+    box-shadow: -8px 0 28px rgba(0, 0, 0, 0.45);
+  }
+}
+
+@media (max-width: 900px) {
+  .app {
+    flex-direction: column-reverse;
+  }
+  .rail {
+    flex-direction: row;
+    width: 100%;
+    height: 62px;
+    padding: 0 6px env(safe-area-inset-bottom);
+    border-right: 0;
+    border-top: 1px solid var(--divider);
+  }
+  .rail__group,
+  .rail__group--bottom {
+    flex-direction: row;
+    gap: 0;
+    flex: 1;
+    justify-content: space-around;
+  }
+  .rail__group--bottom {
+    flex: 0.5;
+  }
+  .rail__group--bottom::before {
+    display: none;
+  }
+  .rail__btn {
+    width: 58px;
+    height: 54px;
+    border-radius: 14px;
+    gap: 2px;
+    align-content: center;
+  }
+  .rail__btn.is-active {
+    background: transparent;
+    color: var(--accent);
+  }
+  .rail__label {
+    display: block;
+    font-size: 11px;
+    line-height: 1;
+  }
+  .rail [data-tooltip]:hover::after {
+    display: none;
+  }
+  .sidebar {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    flex: 1;
+    border-right: 0;
+  }
+  .main {
+    display: none;
+  }
+  .app.is-mobile-main .sidebar,
+  .app.is-mobile-main .rail {
+    display: none;
+  }
+  .app.is-mobile-main .main {
+    display: flex;
+    flex: 1;
+    height: 100%;
+  }
+  .drawer {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    border-left: 0;
+  }
+}
+
+.panel--loading {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  min-height: 120px;
+}
+
+/* ------------------------------------------------------------------
+ * Phone / tablet: WhatsApp-style bottom tab bar + floating buttons
+ * ------------------------------------------------------------------ */
+.tabbar {
+  display: none;
+}
+.fab-stack {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .tabbar {
+    display: flex;
+    flex-shrink: 0;
+    align-items: stretch;
+    justify-content: space-around;
+    width: 100%;
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+    background: var(--panel-bg);
+    border-top: 1px solid var(--divider);
+  }
+  .tabbar__btn {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 0;
+    border: 0;
+    background: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tabbar__pill {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 60px;
+    height: 32px;
+    border-radius: 16px;
+    transition: background 0.18s ease;
+  }
+  .tabbar__btn.is-active {
+    color: var(--text-strong);
+  }
+  .tabbar__btn.is-active .tabbar__pill {
+    background: var(--accent-soft);
+    color: var(--accent-text);
+  }
+  .tabbar__btn:active .tabbar__pill {
+    background: var(--press-bg);
+  }
+  .tabbar__btn.is-active .tabbar__pill .avatar {
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+  .tabbar__label {
+    font-size: 12.5px;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  .tabbar__btn.is-active .tabbar__label {
+    font-weight: 600;
+  }
+  .tabbar__badge {
+    position: absolute;
+    top: -3px;
+    left: 34px;
+    min-width: 19px;
+    height: 19px;
+    padding: 0 5px;
+    border-radius: 10px;
+    background: var(--badge-bg);
+    color: var(--badge-text);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 19px;
+    text-align: center;
+  }
+  .tabbar__dot {
+    position: absolute;
+    top: 3px;
+    left: 38px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  /* The desktop rail is replaced by the tab bar. */
+  .rail {
+    display: none;
+  }
+  .app.is-mobile-main .tabbar {
+    display: none;
+  }
+
+  .sidebar .panel {
+    position: relative;
+  }
+  /* floating buttons belong to the list underneath, not to pushed screens */
+  .sidebar__stack:has(> .sidebar__overlay) .fab-stack {
+    display: none;
+  }
+  .fab-stack {
+    position: absolute;
+    right: 16px;
+    bottom: 16px;
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 12px;
+    pointer-events: none;
+  }
+  .fab-stack > * {
+    pointer-events: auto;
+  }
+  .fab {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    border: 0;
+    border-radius: 16px;
+    background: var(--accent);
+    color: var(--badge-text);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .fab:active {
+    transform: scale(0.95);
+    background: var(--accent-strong);
+  }
+  .fab-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 16px 0 10px;
+    border: 0;
+    border-radius: 14px;
+    background: var(--panel-raised);
+    color: var(--text-strong);
+    font-size: 15px;
+    font-weight: 500;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+  }
+  .fab-pill__icon {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: conic-gradient(from 200deg, #6a5cff, #c84bff, #ff6a88, #4fd1ff, #6a5cff);
+    color: #fff;
+  }
+  /* keep the last chat row reachable above the floating buttons */
+  .chat-list .panel__scroll {
+    padding-bottom: 136px;
+  }
+  .calls-panel .panel__scroll {
+    padding-bottom: 88px;
+  }
+}

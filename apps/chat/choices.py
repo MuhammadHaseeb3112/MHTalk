@@ -23,3 +23,13 @@ class MessageType(models.TextChoices):
     LOCATION = "LOCATION", "Location"
     CONTACT = "CONTACT", "Contact"
     STICKER = "STICKER", "Sticker"
+    POLL = "POLL", "Poll"
+
+
+# Disappearing-message timers offered by WhatsApp (seconds; 0 = off).
+DISAPPEARING_CHOICES = (0, 24 * 60 * 60, 7 * 24 * 60 * 60, 90 * 24 * 60 * 60)
+
+# Prefix of chat-level system notices (e.g. "turned on disappearing
+# messages"). They are stored as TEXT messages like call cards, never expire
+# and never count as unread.
+SYSTEM_PREFIX = "__WHATSUP_SYSTEM__:"

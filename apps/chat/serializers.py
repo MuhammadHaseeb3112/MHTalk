@@ -1,10 +1,14 @@
+from django.conf import settings
+from django.db import transaction
 import json
+from django.db.models import Exists, OuterRef, Prefetch, Q
 from rest_framework import serializers
 from django.utils import timezone
 from apps.accounts.serializers import UserSerializer
-from .choices import MessageType
+from .choices import MessageType, SYSTEM_PREFIX
 from apps.accounts.models import User
 from .models import BlockedUser
+from .models import ChatClear
 from .models import (
     Attachment,
     ChatRoom,
@@ -14,6 +18,7 @@ from .models import (
     StarredMessage,
     DeletedMessage,
     VoiceNote,
+    MessageReceipt,
 
 
 )
@@ -212,6 +217,11 @@ class StarMessageSerializer(serializers.Serializer):
                 "Cannot star a deleted message."
             )
 
+        if message.is_view_once:
+            raise serializers.ValidationError(
+                "View once media can't be starred."
+            )
+
         return message
 
     def save(self):
@@ -267,10 +277,29 @@ class PinMessageSerializer(serializers.Serializer):
                 "Cannot pin a deleted message."
             )
 
+        from .group_events import is_group_event
+
+        if is_group_event(message):
+            raise serializers.ValidationError("System messages cannot be pinned.")
+
         return message
 
     def save(self):
         message = self.validated_data["message"]
+
+        if self.validated_data["is_pinned"] and not message.is_pinned:
+            # WhatsApp keeps up to 3 pins per chat: pinning a 4th replaces the oldest.
+            limit = getattr(settings, "WHATSUP_MAX_PINNED_MESSAGES", 3)
+            pinned = list(
+                Message.objects.filter(room_id=message.room_id, is_pinned=True)
+                .exclude(pk=message.pk)
+                .order_by("-pinned_at", "-id")
+                .values_list("pk", flat=True)
+            )
+            stale = pinned[limit - 1:]
+            if stale:
+                Message.objects.filter(pk__in=stale).update(is_pinned=False, pinned_at=None)
+                self.unpinned_ids = stale
 
         message.is_pinned = self.validated_data["is_pinned"]
 
@@ -339,7 +368,6 @@ class ParticipantSerializer(serializers.ModelSerializer):
             "muted_until",
             "is_archived",
             "joined_at",
-            "is_archived",
         )
 
         read_only_fields = (
@@ -381,8 +409,43 @@ class MessageSerializer(serializers.ModelSerializer):
 
     content = serializers.SerializerMethodField()
 
+    room_id = serializers.IntegerField(read_only=True)
     reply_to = serializers.SerializerMethodField()
+    poll = serializers.SerializerMethodField()
+    mentions = serializers.SerializerMethodField()
+    view_once_opened_by = serializers.SerializerMethodField()
 
+    def get_poll(self, obj):
+        if obj.message_type != MessageType.POLL or obj.is_deleted:
+            return None
+        from .features import poll_payload
+
+        return poll_payload(getattr(obj, "poll", None))
+
+    def get_mentions(self, obj):
+        # Only messages that can contain "@" need the (prefetched) rows.
+        if obj.is_deleted or "@" not in str(obj.content or ""):
+            return []
+        return [row.user_id for row in obj.mention_rows.all()]
+
+    def get_view_once_opened_by(self, obj):
+        if not obj.is_view_once:
+            return []
+        return [row.user_id for row in obj.view_once_opens.all()]
+
+    def to_representation(self, obj):
+        from apps.accounts.privacy import mask_read_state, viewer_from_context
+
+        data = super().to_representation(obj)
+        if obj.is_view_once:
+            # Never expose a URL for view once media: it is fetched once
+            # through /messages/<id>/view-once/ (see ViewOnceMediaAPIView).
+            data["attachments"] = [
+                {**attachment, "file": None} for attachment in data.get("attachments") or []
+            ]
+            if data.get("voice_note"):
+                data["voice_note"] = {**data["voice_note"], "audio": None}
+        return mask_read_state(data, obj.room_id, viewer_from_context(self.context))
 
     def get_content(self, obj):
         """
@@ -412,14 +475,32 @@ class MessageSerializer(serializers.ModelSerializer):
         if not obj.reply_to:
             return None
 
+        reply = obj.reply_to
+        if reply.expires_at and reply.expires_at <= timezone.now():
+            return None  # the quoted message has disappeared
+        first_attachment = None
+        if not reply.is_deleted:
+            first_attachment = next(iter(reply.attachments.all()), None)
+
         return {
-            "id": obj.reply_to.id,
-            "sender_id": obj.reply_to.sender.id,
-            "sender_phone": obj.reply_to.sender.phone_number,
-            "content": obj.reply_to.content,
-            "message_type": obj.reply_to.message_type,
+            "id": reply.id,
+            "sender_id": reply.sender.id,
+            "sender_phone": "" if reply.sender.is_deleted else reply.sender.phone_number,
+            "sender_is_deleted": bool(reply.sender.is_deleted),
+            "content": "" if reply.is_deleted else reply.content,
+            "message_type": reply.message_type,
+            "is_deleted": reply.is_deleted,
+            "is_view_once": reply.is_view_once,
+            "attachment": (
+                {
+                    "file": first_attachment.file.url if first_attachment.file and not reply.is_view_once else None,
+                    "file_name": first_attachment.file_name,
+                    "mime_type": first_attachment.mime_type,
+                }
+                if first_attachment
+                else None
+            ),
         }
-    
 
     def get_is_starred(
         self,
@@ -435,10 +516,14 @@ class MessageSerializer(serializers.ModelSerializer):
         if request.user.is_anonymous:
             return False
 
+        starred_ids = self.context.get("starred_ids")
+        if starred_ids is not None:
+            return obj.id in starred_ids
+
         return obj.starred_by.filter(
             user=request.user,
         ).exists()
-    
+
     def get_forwarded_from(
         self,
         obj,
@@ -449,17 +534,21 @@ class MessageSerializer(serializers.ModelSerializer):
         return {
             "id": obj.forwarded_from.id,
             "sender_id": obj.forwarded_from.sender.id,
-            "sender_phone": obj.forwarded_from.sender.phone_number,
+            "sender_phone": "" if obj.forwarded_from.sender.is_deleted else obj.forwarded_from.sender.phone_number,
+            "sender_is_deleted": bool(obj.forwarded_from.sender.is_deleted),
             "content": obj.forwarded_from.content,
             "message_type": obj.forwarded_from.message_type,
         }
     
 
+    
     class Meta:
         model = Message
 
         fields = (
             "id",
+            "room_id",
+            "client_message_id",
             "sender",
             "message_type",
             "content",
@@ -469,10 +558,20 @@ class MessageSerializer(serializers.ModelSerializer):
             "reactions",
             "is_edited",
             "is_deleted",
+            "is_delivered",
+            "delivered_at",
+            "is_read",
+            "read_at",
             "is_starred",
             "is_pinned",
             "pinned_at",
             "forwarded_from",
+            "expires_at",
+            "is_view_once",
+            "view_once_opened_by",
+            "link_preview",
+            "mentions",
+            "poll",
             "created_at",
             "updated_at",
         )
@@ -483,9 +582,14 @@ class MessageSerializer(serializers.ModelSerializer):
             "attachments",
             "is_edited",
             "is_deleted",
+            "is_delivered",
+            "delivered_at",
+            "is_read",
+            "read_at",
             "created_at",
             "updated_at",
         )
+
 
 
 # ==========================================================
@@ -510,6 +614,7 @@ class SendMessageSerializer(serializers.ModelSerializer):
             "message_type",
             "content",
             "reply_to",
+            "client_message_id",
 
         )
 
@@ -586,29 +691,18 @@ class SendMessageSerializer(serializers.ModelSerializer):
         # LOCATION
         # -----------------------------
         elif message_type == MessageType.LOCATION:
+            from .features import validate_location_content
 
-            if not isinstance(content, dict):
-                raise serializers.ValidationError(
-                    {
-                        "content": "Location must be a JSON object."
-                    }
-                )
+            attrs["content"] = json.dumps(validate_location_content(content))
 
-            required = [
-                "latitude",
-                "longitude",
-                "address",
-            ]
+        # -----------------------------
+        # POLL
+        # -----------------------------
+        elif message_type == MessageType.POLL:
+            from .features import validate_poll_content
 
-            for field in required:
-                if field not in content:
-                    raise serializers.ValidationError(
-                        {
-                            "content": f"{field} is required."
-                        }
-                    )
-
-            attrs["content"] = json.dumps(content)
+            self._poll = validate_poll_content(content)
+            attrs["content"] = self._poll["question"]
 
         else:
 
@@ -642,21 +736,39 @@ class SendMessageSerializer(serializers.ModelSerializer):
                     }
                 )
 
+        if self.instance is None and attrs.get("room") is not None:
+            from .features import validate_mentions
+
+            self._mentions = validate_mentions(attrs["room"], self.initial_data.get("mentions"))
+
         return attrs
 
     def create(self, validated_data):
+        from .features import create_poll, save_mentions
 
         request = self.context["request"]
-
-        return Message.objects.create(
-            sender=request.user,
-            **validated_data,
-        )
-
-
-# ==========================================================
-# Block User
-# ==========================================================
+        client_message_id = str(validated_data.pop("client_message_id", "") or "")[:64]
+        if client_message_id:
+            # Idempotent retry: the same client id in the same room returns the
+            # message that was already stored instead of creating a duplicate.
+            existing = Message.objects.filter(
+                room=validated_data["room"],
+                sender=request.user,
+                client_message_id=client_message_id,
+            ).first()
+            if existing is not None:
+                existing._was_duplicate = True
+                return existing
+        with transaction.atomic():
+            message = Message.objects.create(
+                sender=request.user,
+                client_message_id=client_message_id,
+                **validated_data,
+            )
+            if getattr(self, "_poll", None):
+                create_poll(message, self._poll)
+            save_mentions(message, getattr(self, "_mentions", []))
+        return message
 
 class BlockUserSerializer(serializers.Serializer):
     """
@@ -813,7 +925,9 @@ class ForwardMessageSerializer(serializers.Serializer):
                 }
             )
 
-        if not original.room.participants.filter(
+        from .group_events import is_group_event
+
+        if is_group_event(original) or not original.room.participants.filter(
             user=request.user,
         ).exists():
             raise serializers.ValidationError(
@@ -822,6 +936,11 @@ class ForwardMessageSerializer(serializers.Serializer):
                         "You cannot forward this message."
                     )
                 }
+            )
+
+        if original.is_view_once or original.is_system:
+            raise serializers.ValidationError(
+                {"message": "View once media can't be forwarded."}
             )
 
         return attrs
@@ -837,25 +956,35 @@ class ForwardMessageSerializer(serializers.Serializer):
         new_message = Message.objects.create(
             room=validated_data["room"],
             sender=request.user,
-
             forwarded_from=original,
-
             message_type=original.message_type,
             content=original.content,
-
+            link_preview=original.link_preview,
             reply_to=None,
         )
 
-        # Copy attachments
-        for attachment in original.attachments.all():
+        from .features import copy_poll
 
+        copy_poll(original, new_message)
+
+        # Forwarded copies share the stored file; deletion only removes a file
+        # once no other message references it (see soft_delete_messages_for_everyone).
+        for attachment in original.attachments.all():
             Attachment.objects.create(
                 message=new_message,
                 file=attachment.file,
             )
 
+        voice_note = getattr(original, "voice_note", None)
+        if voice_note is not None:
+            VoiceNote.objects.create(
+                message=new_message,
+                audio=voice_note.audio,
+                duration=voice_note.duration,
+                waveform=list(voice_note.waveform or []),
+            )
+
         return new_message
-    
 
 
 # ==========================================================
@@ -929,7 +1058,18 @@ class UploadMessageSerializer(serializers.Serializer):
         allow_blank=True,
     )
 
+    client_message_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=64,
+    )
+
     file = serializers.FileField()
+
+    view_once = serializers.BooleanField(
+        required=False,
+        default=False,
+    )
 
     def validate_room(
         self,
@@ -956,26 +1096,63 @@ class UploadMessageSerializer(serializers.Serializer):
         file,
     ):
         """
-        Validate uploaded file.
+        Validate uploaded file: size, emptiness and allowed content types.
         """
 
         max_size = 25 * 1024 * 1024  # 25 MB
+
+        if not getattr(file, "size", 0):
+            raise serializers.ValidationError(
+                "The selected file is empty."
+            )
 
         if file.size > max_size:
             raise serializers.ValidationError(
                 "Maximum file size is 25 MB."
             )
 
+        content_type = str(getattr(file, "content_type", "") or "").lower()
+        name = str(getattr(file, "name", "") or "").lower()
+        blocked_extensions = (
+            ".exe", ".bat", ".cmd", ".com", ".msi", ".scr", ".ps1", ".vbs", ".js", ".jar", ".sh",
+        )
+        if name.endswith(blocked_extensions) or content_type in (
+            "application/x-msdownload",
+            "application/x-msdos-program",
+            "application/x-sh",
+            "text/html",
+            "application/javascript",
+            "text/javascript",
+        ):
+            raise serializers.ValidationError(
+                "This file type is not allowed."
+            )
+
         return file
-    
 
     def validate(
         self,
         attrs,
     ):
         """
-        Validate reply message.
+        Validate the upload type and the reply message.
         """
+
+        upload = attrs.get("file")
+        message_type = attrs.get("message_type")
+        content_type = str(getattr(upload, "content_type", "") or "").lower()
+        if message_type == MessageType.IMAGE and content_type and not content_type.startswith("image/"):
+            raise serializers.ValidationError({"file": "Photo messages require an image file."})
+        if message_type == MessageType.VIDEO and content_type and not content_type.startswith("video/"):
+            raise serializers.ValidationError({"file": "Video messages require a video file."})
+        if message_type in (MessageType.TEXT, MessageType.LOCATION, MessageType.CONTACT, MessageType.POLL):
+            raise serializers.ValidationError({"message_type": "Use IMAGE, VIDEO, DOCUMENT or STICKER for uploads."})
+        if attrs.get("view_once") and message_type not in (MessageType.IMAGE, MessageType.VIDEO):
+            raise serializers.ValidationError({"view_once": "Only photos and videos can be sent as view once."})
+
+        from .features import validate_mentions
+
+        attrs["mentions"] = validate_mentions(attrs["room"], self.initial_data.get("mentions"))
 
         reply_to = attrs.get(
             "reply_to",
@@ -1017,23 +1194,40 @@ class UploadMessageSerializer(serializers.Serializer):
             "file",
         )
 
-        message = Message.objects.create(
-            sender=request.user,
-            room=validated_data["room"],
-            message_type=validated_data["message_type"],
-            content=validated_data.get(
-                "content",
-                "",
-            ),
-            reply_to=validated_data.get(
-                "reply_to",
-            ),
-        )
+        client_message_id = str(validated_data.get("client_message_id") or "")[:64]
+        if client_message_id:
+            existing = Message.objects.filter(
+                room=validated_data["room"],
+                sender=request.user,
+                client_message_id=client_message_id,
+            ).first()
+            if existing is not None:
+                existing._was_duplicate = True
+                return existing
 
-        Attachment.objects.create(
-            message=message,
-            file=uploaded_file,
-        )
+        from .features import save_mentions
+
+        with transaction.atomic():
+            message = Message.objects.create(
+                sender=request.user,
+                room=validated_data["room"],
+                message_type=validated_data["message_type"],
+                content=validated_data.get(
+                    "content",
+                    "",
+                ),
+                reply_to=validated_data.get(
+                    "reply_to",
+                ),
+                client_message_id=client_message_id,
+                is_view_once=bool(validated_data.get("view_once")),
+            )
+
+            Attachment.objects.create(
+                message=message,
+                file=uploaded_file,
+            )
+            save_mentions(message, validated_data.get("mentions") or [])
 
         return message
 
@@ -1045,7 +1239,13 @@ class UploadMessageSerializer(serializers.Serializer):
 
 class ChatRoomSerializer(serializers.ModelSerializer):
     """
-    Serializer for chat room list.
+    Serializer for the chat list.
+
+    Per-user state (pinned, favorite, archived, muted) comes from the
+    requesting user's ``Participant`` row. ``ChatRoomListAPIView`` annotates
+    ``_last_message_id`` and ``_unread_count`` and passes the latest messages in
+    the serializer context so the list is built with a constant number of
+    queries; other callers fall back to per-room queries.
     """
 
     participants = ParticipantSerializer(
@@ -1053,16 +1253,20 @@ class ChatRoomSerializer(serializers.ModelSerializer):
         read_only=True,
     )
 
-    participants_count = serializers.IntegerField(
-        source="participants.count",
-        read_only=True,
-    )
-
+    participants_count = serializers.SerializerMethodField()
+    created_by_id = serializers.IntegerField(read_only=True)
     last_message = serializers.SerializerMethodField()
+    unread_count = serializers.SerializerMethodField()
+    is_pinned = serializers.SerializerMethodField()
+    pinned_at = serializers.SerializerMethodField()
+    is_favorite = serializers.SerializerMethodField()
+    is_archived = serializers.SerializerMethodField()
+    is_muted = serializers.SerializerMethodField()
+    muted_until = serializers.SerializerMethodField()
+    unread_mention = serializers.SerializerMethodField()
 
     class Meta:
         model = ChatRoom
-
         fields = (
             "id",
             "name",
@@ -1070,13 +1274,25 @@ class ChatRoomSerializer(serializers.ModelSerializer):
             "description",
             "photo",
             "is_active",
+            "edit_info_admins_only",
+            "send_messages_admins_only",
+            "add_members_admins_only",
+            "created_by_id",
             "participants_count",
             "participants",
             "last_message",
+            "unread_count",
+            "is_pinned",
+            "pinned_at",
+            "is_favorite",
+            "is_archived",
+            "is_muted",
+            "muted_until",
+            "disappearing_seconds",
+            "unread_mention",
             "created_at",
             "updated_at",
         )
-
         read_only_fields = (
             "id",
             "participants_count",
@@ -1085,16 +1301,102 @@ class ChatRoomSerializer(serializers.ModelSerializer):
             "updated_at",
         )
 
+    # -- helpers ---------------------------------------------------------
+    def _request_user(self):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return None
+        return request.user
+
+    def _membership(self, obj):
+        user = self._request_user()
+        if user is None:
+            return None
+        cache = getattr(obj, "_membership_cache", None)
+        if cache is None:
+            cache = next(
+                (p for p in obj.participants.all() if p.user_id == user.id),
+                None,
+            )
+            obj._membership_cache = cache
+        return cache
+
+    def _blocked_ids(self):
+        if "_blocked_ids" not in self.context:
+            user = self._request_user()
+            if user is None:
+                ids = set()
+            else:
+                rows = BlockedUser.objects.filter(
+                    Q(blocked_by=user) | Q(blocked_user=user)
+                ).values_list("blocked_by_id", "blocked_user_id")
+                rows = list(rows)
+                ids = {blocked if blocker == user.id else blocker for blocker, blocked in rows}
+                self.context["_blocked_me_ids"] = {blocker for blocker, blocked in rows if blocked == user.id}
+            self.context["_blocked_ids"] = ids
+        return self.context["_blocked_ids"]
+
+    def to_representation(self, obj):
+        data = super().to_representation(obj)
+        blocked = self._blocked_ids()
+        if blocked:
+            # Like WhatsApp: no online / last seen across a block (either way).
+            for participant in data.get("participants") or []:
+                user = participant.get("user") or {}
+                if user.get("id") in blocked and isinstance(user.get("profile"), dict):
+                    user["profile"]["is_online"] = False
+                    user["profile"]["last_seen"] = None
+                    # Someone who blocked me also hides their photo from me.
+                    if user.get("id") in self.context.get("_blocked_me_ids", ()):
+                        user["profile"]["profile_picture"] = None
+        return data
+
+    # -- fields ----------------------------------------------------------
+    def get_participants_count(self, obj):
+        return len(obj.participants.all())
+
+    def get_is_pinned(self, obj):
+        membership = self._membership(obj)
+        return bool(membership and membership.is_pinned)
+
+    def get_pinned_at(self, obj):
+        membership = self._membership(obj)
+        return membership.pinned_at if membership and membership.pinned_at else None
+
+    def get_is_favorite(self, obj):
+        membership = self._membership(obj)
+        return bool(membership and membership.is_favorite)
+
+    def get_is_archived(self, obj):
+        membership = self._membership(obj)
+        return bool(membership and membership.is_archived)
+
+    def get_is_muted(self, obj):
+        membership = self._membership(obj)
+        if not membership or not membership.is_muted:
+            return False
+        if membership.muted_until and membership.muted_until <= timezone.now():
+            return False
+        return True
+
+    def get_muted_until(self, obj):
+        membership = self._membership(obj)
+        if not membership or not membership.is_muted:
+            return None
+        return membership.muted_until
+
     def get_last_message(self, obj):
         """
-        Return the latest message in the room.
+        Return the latest message this user can see in the room.
         """
-
-        message = (
-            obj.messages
-            .order_by("-created_at")
-            .first()
-        )
+        last_messages = self.context.get("last_messages")
+        if last_messages is not None and hasattr(obj, "_last_message_id"):
+            message = last_messages.get(obj._last_message_id)
+        else:
+            message = visible_messages_for_user(
+                Message.objects.filter(room=obj),
+                self._request_user(),
+            ).order_by("-created_at", "-id").first()
 
         if not message:
             return None
@@ -1103,6 +1405,112 @@ class ChatRoomSerializer(serializers.ModelSerializer):
             message,
             context=self.context,
         ).data
+
+    def get_unread_mention(self, obj):
+        """True while an unread message in this chat @mentions the user."""
+        if hasattr(obj, "_unread_mention"):
+            return bool(obj._unread_mention)
+        user = self._request_user()
+        if user is None or obj.room_type != "GROUP":
+            return False
+        return unread_mentions_for_user(Message.objects.filter(room=obj), user).exists()
+
+    def get_unread_count(self, obj):
+        if hasattr(obj, "_unread_count"):
+            return int(obj._unread_count or 0)
+        user = self._request_user()
+        if user is None:
+            return 0
+        return unread_messages_for_user(
+            Message.objects.filter(room=obj),
+            user,
+        ).count()
+
+
+def with_message_relations(queryset):
+    """
+    Load everything ``MessageSerializer`` touches in a fixed number of
+    queries (no N+1): sender/profile, the replied and forwarded message with
+    their senders, the voice note, attachments and reactions with their user.
+    Every view that returns full messages goes through this one helper.
+    """
+    return queryset.select_related(
+        "sender__profile",
+        "reply_to__sender__profile",
+        "forwarded_from__sender__profile",
+        "voice_note",
+        "poll",
+    ).prefetch_related(
+        "attachments",
+        "reply_to__attachments",
+        Prefetch("reactions", queryset=Reaction.objects.select_related("user")),
+        "poll__options__votes",
+        "mention_rows",
+        "view_once_opens",
+    )
+
+
+def starred_ids_for(user, message_ids):
+    """Ids among ``message_ids`` that ``user`` starred (one query)."""
+    if not user or user.is_anonymous or not message_ids:
+        return set()
+    return set(
+        StarredMessage.objects.filter(user=user, message_id__in=list(message_ids))
+        .values_list("message_id", flat=True)
+    )
+
+
+def visible_messages_for_user(queryset, user):
+    """
+    Restrict a Message queryset to what ``user`` may see: excludes messages
+    the user deleted for themselves and history hidden by Clear/Delete chat.
+    """
+    if user is None:
+        return queryset
+    cleared = ChatClear.objects.filter(
+        room_id=OuterRef("room_id"),
+        user=user,
+        cleared_at__gte=OuterRef("created_at"),
+    )
+    hidden_for_me = DeletedMessage.objects.filter(
+        message_id=OuterRef("pk"),
+        user=user,
+    )
+    return queryset.filter(~Exists(cleared)).filter(~Exists(hidden_for_me))
+
+
+def unread_messages_for_user(queryset, user):
+    """Incoming, visible, not-yet-read messages for ``user``."""
+    recipient_receipt = MessageReceipt.objects.filter(
+        message_id=OuterRef("pk"), recipient_id=user.id,
+    )
+    recipient_read_receipt = MessageReceipt.objects.filter(
+        message_id=OuterRef("pk"), recipient_id=user.id, read_at__isnull=False,
+    )
+    from .group_events import GROUP_EVENT_PREFIX
+
+    return (
+        visible_messages_for_user(queryset, user)
+        .filter(is_deleted=False)
+        .exclude(sender_id=user.id)
+        # "X turned on disappearing messages" notices never count as unread.
+        .exclude(content__startswith=SYSTEM_PREFIX)
+        # group system messages ("X joined…") never count as unread
+        .exclude(content__startswith=GROUP_EVENT_PREFIX)
+        .annotate(
+            _has_recipient_receipt=Exists(recipient_receipt),
+            _recipient_has_read=Exists(recipient_read_receipt),
+        )
+        .filter(
+            Q(_has_recipient_receipt=True, _recipient_has_read=False)
+            | Q(_has_recipient_receipt=False, is_read=False)
+        )
+    )
+
+
+def unread_mentions_for_user(queryset, user):
+    """Unread messages that @mention ``user``."""
+    return unread_messages_for_user(queryset.filter(mention_rows__user_id=user.id), user)
 
 
 # ==========================================================
@@ -1182,6 +1590,12 @@ class MessageSearchSerializer(serializers.ModelSerializer):
             "is_deleted",
             "created_at",
         )
+
+    def to_representation(self, obj):
+        data = super().to_representation(obj)
+        if obj.is_view_once:
+            data["attachments"] = [{**item, "file": None} for item in data.get("attachments") or []]
+        return data
 
     def get_reply_to(self, obj):
         if not obj.reply_to:

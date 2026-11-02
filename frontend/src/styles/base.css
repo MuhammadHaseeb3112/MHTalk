@@ -1,0 +1,303 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  min-width: 320px;
+  background: var(--app-bg);
+  color: var(--text);
+  font-family: var(--font), var(--font-emoji);
+  font-size: var(--fs-md);
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+a {
+  color: var(--link);
+}
+
+img,
+video {
+  display: block;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Thin, unobtrusive scrollbars like WhatsApp Web */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar);
+  border-radius: 3px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.emoji {
+  font-family: var(--font-emoji);
+}
+
+/* ---------------------------------------------------------------- buttons */
+.icon-btn {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: var(--icon);
+  transition: background-color 0.15s ease, color 0.15s ease;
+  flex: none;
+}
+.icon-btn:hover,
+.icon-btn.is-active {
+  background: var(--hover-bg);
+  color: var(--icon-strong);
+}
+.icon-btn__badge {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: var(--badge-bg);
+  color: var(--badge-text);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 22px;
+  border-radius: var(--radius-pill);
+  font-weight: 500;
+  transition: background-color 0.15s ease, filter 0.15s ease;
+  white-space: nowrap;
+}
+.btn--primary {
+  background: var(--accent);
+  color: var(--badge-text);
+}
+.btn--primary:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+.btn--ghost {
+  color: var(--accent);
+  border: 1px solid var(--chip-border);
+}
+.btn--ghost:hover:not(:disabled) {
+  background: var(--hover-bg);
+}
+.btn--danger {
+  background: var(--danger);
+  color: #fff;
+}
+.btn--text {
+  color: var(--accent);
+  padding: 0 12px;
+}
+.btn--block {
+  width: 100%;
+}
+
+.fab {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--badge-text);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+.fab:hover:not(:disabled) {
+  background: var(--accent-strong);
+  transform: scale(1.04);
+}
+
+.spinner {
+  animation: spin 0.9s linear infinite;
+  color: var(--accent);
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Tooltips via data attribute (CSS only, no layout cost) */
+[data-tooltip] {
+  position: relative;
+}
+@media (hover: hover) {
+  [data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 5px 9px;
+    border-radius: var(--radius-sm);
+    background: var(--tooltip-bg);
+    color: var(--tooltip-text);
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 60;
+    animation: fade-in 0.15s ease 0.45s both;
+  }
+  .rail [data-tooltip]:hover::after {
+    top: 50%;
+    left: calc(100% + 10px);
+    transform: translateY(-50%);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ---------------------------------------------------------------- forms */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+.field label {
+  color: var(--accent);
+  font-size: var(--fs-sm);
+}
+.field input,
+.field textarea,
+.field select {
+  width: 100%;
+  border: 0;
+  border-bottom: 2px solid var(--divider-strong);
+  background: transparent;
+  padding: 8px 2px;
+  outline: none;
+  font-size: var(--fs-lg);
+  transition: border-color 0.15s ease;
+}
+.field input:focus,
+.field textarea:focus {
+  border-color: var(--accent);
+}
+.field__hint {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.field__error,
+.form-error {
+  color: var(--danger);
+  font-size: var(--fs-sm);
+}
+.form-error {
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--danger-soft);
+  margin-bottom: 14px;
+}
+
+.checkbox {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 2px solid var(--text-muted);
+  color: var(--badge-text);
+  flex: none;
+}
+.checkbox.is-checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.toggle {
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--divider-strong);
+  position: relative;
+  transition: background-color 0.2s ease;
+  flex: none;
+}
+.toggle span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--toggle-knob);
+  transition: transform 0.2s ease;
+}
+.toggle.is-on {
+  background: var(--accent);
+}
+.toggle.is-on span {
+  transform: translateX(16px);
+  background: #fff;
+}

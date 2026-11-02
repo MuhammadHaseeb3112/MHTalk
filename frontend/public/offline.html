@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MHTalk — offline</title>
+  <meta name="theme-color" content="#161717" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <style>
+    :root { color-scheme: dark; --bg: #161717; --text: #e9edef; --muted: #8696a0; --accent: #21c063; --btn-text: #0b141a; }
+    :root[data-theme="light"] { color-scheme: light; --bg: #f0f2f5; --text: #111b21; --muted: #667781; --accent: #008069; --btn-text: #fff; }
+    html, body { height: 100%; margin: 0; }
+    body { display: grid; place-items: center; background: var(--bg); color: var(--text);
+      font-family: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; text-align: center; }
+    main { max-width: 360px; padding: 24px; }
+    img { width: 72px; height: 72px; border-radius: 18px; }
+    h1 { font-size: 22px; font-weight: 500; margin: 18px 0 8px; }
+    p { color: var(--muted); font-size: 14px; line-height: 1.5; margin: 0 0 22px; }
+    button { height: 40px; padding: 0 24px; border: 0; border-radius: 999px; background: var(--accent);
+      color: var(--btn-text); font: inherit; font-weight: 600; cursor: pointer; }
+  </style>
+  <script>
+    (function () {
+      var pref = "system";
+      try { pref = localStorage.getItem("whatsup_theme") || "system"; } catch (e) { /* ignore */ }
+      var light = pref === "light" || (pref !== "dark" && window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches);
+      document.documentElement.setAttribute("data-theme", light ? "light" : "dark");
+      window.addEventListener("online", function () { location.reload(); });
+    })();
+  </script>
+</head>
+<body>
+  <main>
+    <img src="/pwa-192.png" alt="" />
+    <h1>You're offline</h1>
+    <p>MHTalk needs an internet connection. Check your Wi-Fi or mobile data — we'll reconnect automatically.</p>
+    <button type="button" onclick="location.reload()">Try again</button>
+  </main>
+</body>
+</html>

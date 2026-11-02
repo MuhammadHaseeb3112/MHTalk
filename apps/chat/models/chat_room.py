@@ -55,6 +55,37 @@ class ChatRoom(models.Model):
         default=True,
     )
 
+    disappearing_seconds = models.PositiveIntegerField(
+        default=0,
+        help_text="Disappearing messages timer for new messages (0 = off).",
+    )
+
+    # -- Group permissions (Group info > Group permissions). ``True`` means
+    # only admins may do it. Checked by apps/chat/permissions.py.
+    edit_info_admins_only = models.BooleanField(
+        default=True,
+        help_text="Only admins can edit the group name, icon, description and disappearing timer.",
+    )
+
+    send_messages_admins_only = models.BooleanField(
+        default=False,
+        help_text="Only admins can send messages.",
+    )
+
+    add_members_admins_only = models.BooleanField(
+        default=True,
+        help_text="Only admins can add members and share the invite link.",
+    )
+
+    # Group invite link code (https://<host>/join/<code>). Unguessable
+    # (secrets.token_urlsafe); resetting it makes the old link stop working.
+    invite_code = models.CharField(
+        max_length=64,
+        unique=True,
+        null=True,
+        blank=True,
+    )
+
     created_at = models.DateTimeField(
         auto_now_add=True,
     )

@@ -14,3 +14,12 @@ class CallStatus(models.TextChoices):
     MISSED = "MISSED", "Missed"
     CANCELLED = "CANCELLED", "Cancelled"
     BUSY = "BUSY", "Busy"
+
+class ParticipantState(models.TextChoices):
+    """Where one person is in a call (mainly used by group calls)."""
+
+    RINGING = "RINGING", "Ringing"
+    JOINED = "JOINED", "Joined"
+    DECLINED = "DECLINED", "Declined"
+    MISSED = "MISSED", "Missed"
+    LEFT = "LEFT", "Left"

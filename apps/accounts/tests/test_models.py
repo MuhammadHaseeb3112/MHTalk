@@ -115,7 +115,7 @@ class ProfileModelTestCase(TestCase):
         """
         self.assertEqual(
             self.profile.about,
-            "Hey there! I'm using WhatsUp.",
+            "Hey there! I'm using MHTalk.",
         )
 
     def test_default_online_status(self):
@@ -181,4 +181,4 @@ class ProfileModelTestCase(TestCase):
         self.assertEqual(
             Profile.objects.filter(user=self.user).count(),
             1,
-        )
+        )

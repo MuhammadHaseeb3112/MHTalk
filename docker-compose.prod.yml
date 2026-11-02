@@ -1,0 +1,124 @@
+# Production stack on one server (e.g. a free Oracle Cloud VM):
+#
+#   cp deploy/env.prod.example .env.prod   # then edit the values
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#
+# caddy  - HTTPS, React app, /media, proxy to the backend
+# web    - Django + Channels (uvicorn, several workers)
+# scheduler - periodic jobs (purges disappeared messages every 5 minutes)
+# db     - PostgreSQL     redis - Channels layer + cache + rate limits
+# turn   - optional coturn relay for calls: add  --profile turn
+
+services:
+  caddy:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - media:/media:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.backend
+    restart: unless-stopped
+    env_file: .env.prod
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+      MEDIA_ROOT: /app/media
+    volumes:
+      - media:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Periodic jobs. Same image as "web" but without its entrypoint (no
+  # migrations, no uvicorn): every 5 minutes it deletes disappeared messages
+  # (and their files) and view once media every recipient has opened.
+  scheduler:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.backend
+    restart: unless-stopped
+    env_file: .env.prod
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+      MEDIA_ROOT: /app/media
+    volumes:
+      - media:/app/media
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        while true; do
+          python manage.py purge_expired_messages || echo "purge_expired_messages failed"
+          sleep 300
+        done
+    healthcheck:
+      disable: true
+    depends_on:
+      web:
+        condition: service_healthy
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    command: >-
+      postgres -c max_connections=100 -c shared_buffers=256MB
+      -c work_mem=8MB -c effective_cache_size=768MB
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy volatile-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  turn:
+    image: coturn/coturn:4.7
+    profiles: ["turn"]
+    restart: unless-stopped
+    network_mode: host
+    command: >-
+      -n --log-file=stdout --fingerprint --lt-cred-mech
+      --use-auth-secret --static-auth-secret=${TURN_SECRET}
+      --realm=${DOMAIN} --listening-port=3478
+      --min-port=49160 --max-port=49200 --no-cli --no-tlsv1 --no-tlsv1_1
+
+volumes:
+  postgres_data:
+  redis_data:
+  media:
+  caddy_data:
+  caddy_config:

@@ -1,6 +1,25 @@
-from django.db import models
-from .message import Message
 import mimetypes
+import os
+import uuid
+
+from django.db import models
+
+from .message import Message
+
+# View once media is stored here (relative to MEDIA_ROOT). Caddy and the
+# development media server refuse /media/private/*; the file is only served
+# by ViewOnceMediaAPIView after membership and "not opened yet" checks.
+PRIVATE_MEDIA_DIR = "private"
+
+
+def attachment_upload_to(instance, filename):
+    """Public uploads keep the original layout; view once media is private
+    and gets an unguessable name."""
+    message = getattr(instance, "message", None)
+    if message is not None and message.is_view_once:
+        extension = os.path.splitext(filename)[1].lower()[:10]
+        return f"{PRIVATE_MEDIA_DIR}/view_once/{uuid.uuid4().hex}{extension}"
+    return f"chat/attachments/{filename}"
 
 
 class Attachment(models.Model):
@@ -18,7 +37,7 @@ class Attachment(models.Model):
     )
 
     file = models.FileField(
-        upload_to="chat/attachments/",
+        upload_to=attachment_upload_to,
         help_text="Uploaded attachment file.",
     )
 

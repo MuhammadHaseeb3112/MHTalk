@@ -1,0 +1,56 @@
+# DOMAIN=chat.example.com  -> real HTTPS certificate (Let's Encrypt), automatic.
+# DOMAIN=http://localhost  -> plain HTTP for a local test.
+{$DOMAIN:localhost} {
+	encode zstd gzip
+
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		Referrer-Policy same-origin
+		Permissions-Policy "geolocation=(self), camera=(self), microphone=(self), display-capture=(self)"
+	}
+
+	# Backend: REST API, WebSockets (chat + call signalling), admin, API docs assets.
+	@backend path /api/* /ws/* /admin/* /static/*
+	handle @backend {
+		reverse_proxy web:8000 {
+			flush_interval -1
+		}
+	}
+
+	# Uploaded photos, videos, voice notes (Range requests for seeking work).
+	# View once media lives in /media/private/ and is never served by URL:
+	# the only way to read it is the authenticated one-time endpoint
+	# /api/chat/messages/<id>/view-once/. "hide" works on the resolved file
+	# path, so tricks like //, /./ or ../ can't reach it either.
+	handle_path /media/* {
+		@private path_regexp private (?i)^/+private(/|$)
+		respond @private "Not found" 404
+		root * /media
+		header Cache-Control "private, max-age=86400"
+		file_server {
+			hide /media/private
+		}
+	}
+
+	# Service worker + manifest must never be cached, so a new deploy is picked up.
+	@pwa path /sw.js /manifest.webmanifest
+	handle @pwa {
+		root * /srv
+		header Cache-Control "no-cache"
+		file_server
+	}
+
+	# React app (single-page): unknown paths fall back to index.html.
+	handle {
+		root * /srv
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		try_files {path} /index.html
+		file_server
+	}
+
+	request_body {
+		max_size 110MB
+	}
+}

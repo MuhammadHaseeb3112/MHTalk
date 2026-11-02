@@ -1,11 +1,15 @@
 from django.contrib import admin
+
+
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .forms import (
     CustomUserCreationForm,
     CustomUserChangeForm,
 )
 
-from .models import User, Profile
+from apps.status.models import Status
+
+from .models import User, Profile, Contact
 
 
 class ProfileInline(admin.StackedInline):
@@ -69,6 +73,7 @@ class UserAdmin(BaseUserAdmin):
     """
 
     list_display = (
+        "id",
         "phone_number",
         "email",
         "is_verified",
@@ -165,3 +170,7 @@ class UserAdmin(BaseUserAdmin):
             },
         ),
     )
+
+
+
+admin.site.register(Contact)

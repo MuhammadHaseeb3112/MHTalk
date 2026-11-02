@@ -2,17 +2,20 @@ from django.urls import path
 
 from .views import (
     ContactsStatusAPIView,
+    StatusContactsAPIView,
     DeleteStatusAPIView,
     MyStatusAPIView,
     UploadStatusAPIView,
     ViewStatusAPIView,
     StatusViewersAPIView,
     UpdateStatusPrivacyAPIView,
+    StatusReactionAPIView,
 )
 
 app_name = "status"
 
 urlpatterns = [
+    path("contacts/", StatusContactsAPIView.as_view(), name="status-privacy-contacts"),
 
     path(
         "",
@@ -42,6 +45,12 @@ urlpatterns = [
         "<int:pk>/delete/",
         DeleteStatusAPIView.as_view(),
         name="status-delete",
+    ),
+
+    path(
+        "<int:pk>/react/",
+        StatusReactionAPIView.as_view(),
+        name="status-react",
     ),
 
     path(

@@ -417,13 +417,14 @@ class MessageListAPIViewTest(APITestCase):
             0,
         )
 
-    def test_deleted_messages_are_hidden(self):
+    def test_deleted_messages_are_returned_as_tombstones(self):
         """
-        Soft deleted messages should not
-        appear in the response.
+        Messages deleted for everyone stay in the history as a
+        tombstone ("This message was deleted") with no content.
         """
 
         self.message2.is_deleted = True
+        self.message2.content = ""
         self.message2.save()
 
         self.client.force_authenticate(
@@ -434,8 +435,22 @@ class MessageListAPIViewTest(APITestCase):
 
         self.assertEqual(
             len(response.data),
-            1,
+            2,
         )
+        tombstone = next(item for item in response.data if item["id"] == self.message2.id)
+        self.assertTrue(tombstone["is_deleted"])
+        self.assertEqual(tombstone["content"], "")
+
+    def test_message_history_supports_limit_and_before(self):
+        self.client.force_authenticate(user=self.user)
+
+        newest = self.client.get(self.url, {"limit": 1})
+        self.assertEqual(len(newest.data), 1)
+        self.assertEqual(newest.data[0]["id"], self.message2.id)
+
+        older = self.client.get(self.url, {"limit": 1, "before": self.message2.id})
+        self.assertEqual(len(older.data), 1)
+        self.assertEqual(older.data[0]["id"], self.message1.id)
 
     def test_messages_are_ordered_by_created_at(self):
         """

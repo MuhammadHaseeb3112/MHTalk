@@ -1,0 +1,28 @@
+# Production image for the Django/Channels backend (HTTP + WebSockets).
+FROM python:3.13-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    DJANGO_SETTINGS_MODULE=config.settings.production
+
+WORKDIR /app
+
+COPY requirements/ requirements/
+RUN pip install -r requirements/production.txt
+
+COPY . .
+
+# Static files for /admin and /api/docs, served by WhiteNoise.
+RUN SECRET_KEY=build-only DB_PASSWORD=build-only python manage.py collectstatic --noinput \
+    && useradd --create-home --uid 1000 app \
+    && mkdir -p /app/media \
+    && chown -R app:app /app/media /app/staticfiles
+
+USER app
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+    CMD python -c "import os,urllib.request;urllib.request.urlopen(f'http://127.0.0.1:{os.environ.get(\"PORT\",\"8000\")}/api/health/',timeout=4)"
+
+ENTRYPOINT ["sh", "deploy/entrypoint.sh"]

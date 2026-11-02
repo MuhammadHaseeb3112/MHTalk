@@ -1,0 +1,16 @@
+# Builds the React app and serves it with Caddy (automatic HTTPS), which also
+# reverse-proxies /api, /ws, /admin, /static to the backend and serves /media.
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ ./
+# Same-origin by default (Caddy proxies /api and /ws), so no URLs are needed.
+ARG VITE_API_URL=
+ARG VITE_WS_URL=
+ENV VITE_API_URL=$VITE_API_URL VITE_WS_URL=$VITE_WS_URL
+RUN npm run build
+
+FROM caddy:2-alpine
+COPY deploy/Caddyfile /etc/caddy/Caddyfile
+COPY --from=build /app/dist /srv

@@ -46,6 +46,21 @@ class Participant(models.Model):
         help_text="Whether the chat is archived for this user.",
     )
 
+    is_pinned = models.BooleanField(
+        default=False,
+        help_text="Whether the chat is pinned to the top of this user's list.",
+    )
+
+    pinned_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    is_favorite = models.BooleanField(
+        default=False,
+        help_text="Whether the chat appears under this user's Favorites filter.",
+    )
+
     joined_at = models.DateTimeField(
         auto_now_add=True,
     )

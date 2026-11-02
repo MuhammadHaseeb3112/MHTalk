@@ -1,5 +1,14 @@
 from django.urls import path
 
+from .assistant import AssistantAPIView
+from .group_views import (
+    GroupInviteLinkAPIView,
+    GroupPermissionsAPIView,
+    InviteJoinAPIView,
+    InvitePreviewAPIView,
+    ResetGroupInviteLinkAPIView,
+)
+
 from .views import (
     AddParticipantAPIView,
     ChatRoomDetailAPIView,
@@ -9,6 +18,8 @@ from .views import (
     DeleteMessageAPIView,
     LeaveGroupAPIView,
     MessageListAPIView,
+    MessageInfoAPIView,
+    ChatRoomInfoAPIView,
     RemoveParticipantAPIView,
     SendMessageAPIView,
     UploadMessageAPIView,
@@ -26,12 +37,38 @@ from .views import (
     ArchiveChatAPIView,
     DeleteForMeAPIView,
     UploadVoiceAPIView,
+    DeleteChatAPIView,
+    ClearChatAPIView,
+    DeleteMessagesForEveryoneAPIView,
+    DeleteMessagesForMeAPIView,
+    PinChatAPIView,
+    FavoriteChatAPIView,
+    MarkRoomReadAPIView,
+    MarkAllReadAPIView,
+    ParticipantAdminAPIView,
+    RoomSharedMediaAPIView,
+    AllSharedMediaAPIView,
+    RoomPinnedMessagesAPIView,
+    GlobalMessageSearchAPIView,
+)
 
+from .feature_views import (
+    DisappearingMessagesAPIView,
+    LinkPreviewAPIView,
+    PollVoteAPIView,
+    ViewOnceMediaAPIView,
 )
 
 app_name = "chat"
 
 urlpatterns = [
+    # ==========================
+    # Polls, disappearing messages, view once, link previews
+    # ==========================
+    path("messages/<int:message_id>/poll/vote/", PollVoteAPIView.as_view(), name="poll-vote"),
+    path("messages/<int:message_id>/view-once/", ViewOnceMediaAPIView.as_view(), name="view-once-media"),
+    path("rooms/<int:pk>/disappearing/", DisappearingMessagesAPIView.as_view(), name="room-disappearing"),
+    path("link-preview/", LinkPreviewAPIView.as_view(), name="link-preview"),
     # ==========================
     # Chat Rooms
     # ==========================
@@ -51,6 +88,61 @@ urlpatterns = [
         name="group-room-create",
     ),
     path(
+        "rooms/<int:pk>/delete/",
+        DeleteChatAPIView.as_view(),
+        name="room-delete-for-me",
+    ),
+    path(
+        "rooms/<int:pk>/clear/",
+        ClearChatAPIView.as_view(),
+        name="room-clear-for-me",
+    ),
+    path(
+        "rooms/<int:pk>/read/",
+        MarkRoomReadAPIView.as_view(),
+        name="room-mark-read",
+    ),
+    path(
+        "rooms/read-all/",
+        MarkAllReadAPIView.as_view(),
+        name="rooms-mark-all-read",
+    ),
+    path(
+        "rooms/pin/",
+        PinChatAPIView.as_view(),
+        name="room-pin",
+    ),
+    path(
+        "rooms/favorite/",
+        FavoriteChatAPIView.as_view(),
+        name="room-favorite",
+    ),
+    path(
+        "rooms/<int:pk>/media/",
+        RoomSharedMediaAPIView.as_view(),
+        name="room-media",
+    ),
+    path(
+        "rooms/<int:pk>/pinned/",
+        RoomPinnedMessagesAPIView.as_view(),
+        name="room-pinned-messages",
+    ),
+    path(
+        "media/",
+        AllSharedMediaAPIView.as_view(),
+        name="all-shared-media",
+    ),
+    path(
+        "ai/",
+        AssistantAPIView.as_view(),
+        name="assistant",
+    ),
+    path(
+        "rooms/<int:pk>/info/",
+        ChatRoomInfoAPIView.as_view(),
+        name="room-info",
+    ),
+    path(
         "rooms/<int:pk>/",
         ChatRoomDetailAPIView.as_view(),
         name="room-detail",
@@ -64,6 +156,12 @@ urlpatterns = [
         MessageListAPIView.as_view(),
         name="message-list",
     ),
+    path(
+        "messages/<int:message_id>/info/",
+        MessageInfoAPIView.as_view(),
+        name="message-info",
+    ),
+
     path(
         "messages/",
         SendMessageAPIView.as_view(),
@@ -150,6 +248,16 @@ urlpatterns = [
     ),
 
     path(
+        "messages/delete-for-everyone/",
+        DeleteMessagesForEveryoneAPIView.as_view(),
+        name="messages-delete-for-everyone",
+    ),
+    path(
+        "messages/delete-many-for-me/",
+        DeleteMessagesForMeAPIView.as_view(),
+        name="messages-delete-many-for-me",
+    ),
+    path(
         "messages/delete-for-me/",
         DeleteForMeAPIView.as_view(),
         name="message-delete-for-me",
@@ -184,8 +292,27 @@ urlpatterns = [
         name="participant-remove",
     ),
     path(
+        "rooms/<int:room_id>/participants/<int:user_id>/admin/",
+        ParticipantAdminAPIView.as_view(),
+        name="participant-admin",
+    ),
+    path(
+        "messages/search/",
+        GlobalMessageSearchAPIView.as_view(),
+        name="message-search-global",
+    ),
+    path(
         "rooms/<int:room_id>/leave/",
         LeaveGroupAPIView.as_view(),
         name="leave-group",
     ),
+
+    # ==========================
+    # Group permissions & invite links
+    # ==========================
+    path("rooms/<int:pk>/permissions/", GroupPermissionsAPIView.as_view(), name="group-permissions"),
+    path("rooms/<int:pk>/invite-link/", GroupInviteLinkAPIView.as_view(), name="group-invite-link"),
+    path("rooms/<int:pk>/invite-link/reset/", ResetGroupInviteLinkAPIView.as_view(), name="group-invite-link-reset"),
+    path("invite/<str:code>/", InvitePreviewAPIView.as_view(), name="group-invite-preview"),
+    path("invite/<str:code>/join/", InviteJoinAPIView.as_view(), name="group-invite-join"),
 ]

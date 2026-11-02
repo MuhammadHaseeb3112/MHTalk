@@ -33,8 +33,8 @@ ENV/
 db.sqlite3
 db.sqlite3-journal
 
-media/
-staticfiles/
+/media/
+/staticfiles/
 
 ###############################################################################
 # Static & Media Cache
@@ -180,3 +180,15 @@ site/
 ###############################################################################
 
 .local/
+###############################################################################
+# Local data dumps / backups (may contain private user data) — never commit
+###############################################################################
+
+sqlite_backup.json
+*.sqlite3.backup
+db.sqlite3.backup
+*.dump
+deploy/.env.prod
+
+# files written by the automated tests
+/test_media/

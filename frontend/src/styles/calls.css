@@ -1,0 +1,745 @@
+/* ---------------------------------------------------------------- calls list */
+.call-row {
+  cursor: pointer;
+}
+.call-row .row__title.is-missed {
+  color: var(--danger);
+}
+.call-row__sub {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.call-row__sub svg {
+  color: var(--accent);
+}
+.call-row__sub.is-missed svg {
+  color: var(--danger);
+}
+.call-row__time {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  flex: none;
+}
+
+/* ---------------------------------------------------------------- call screen (WhatsApp Web style) */
+.call-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: flex;
+  flex-direction: column;
+  background: #1f2121;
+  color: #fff;
+  animation: fade-in 0.2s ease;
+}
+.call-screen__stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin: 12px 12px 0;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #232525;
+}
+.call-screen__center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+}
+.call-screen__center h2 {
+  margin: 14px 0 0;
+  font-size: 22px;
+  font-weight: 400;
+}
+.call-screen__center p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.7);
+  font-variant-numeric: tabular-nums;
+}
+.call-screen__center.is-ringing-video {
+  justify-content: flex-start;
+  padding-top: 7vh;
+}
+.call-screen__center.is-ringing-video h2 {
+  margin-top: 6px;
+  font-size: 20px;
+}
+.call-screen__preview {
+  width: min(640px, 80%);
+  aspect-ratio: 16 / 9;
+  margin-top: 24px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+.call-screen__warning {
+  margin-top: 6px !important;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(255, 210, 121, 0.14);
+  color: #ffd279 !important;
+  font-size: var(--fs-sm);
+}
+.call-screen__main {
+  position: absolute;
+  inset: 0;
+  background: #000;
+}
+.call-screen__label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 0 40px;
+  background: linear-gradient(rgba(0, 0, 0, 0.5), transparent);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+.call-screen__label strong {
+  font-size: 18px;
+  font-weight: 600;
+}
+.call-screen__label span {
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+.call-screen__badge {
+  position: absolute;
+  top: 26px;
+  left: 26px;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+}
+.call-video {
+  width: 100%;
+  height: 100%;
+  background: #000;
+}
+.call-video--cover {
+  object-fit: cover;
+}
+.call-video--contain {
+  object-fit: contain;
+}
+.call-video.is-mirrored {
+  transform: scaleX(-1);
+}
+
+/* Small draggable preview (click to swap). */
+.call-pip {
+  position: absolute;
+  z-index: 5;
+  width: 300px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #111;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  transition: top 0.25s ease, bottom 0.25s ease, left 0.25s ease, right 0.25s ease, box-shadow 0.15s ease;
+}
+.call-pip:hover {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6), 0 8px 28px rgba(0, 0, 0, 0.55);
+}
+.call-pip.is-dragging {
+  cursor: grabbing;
+  transition: none;
+  opacity: 0.92;
+}
+.call-pip--br { right: 14px; bottom: 14px; }
+.call-pip--bl { left: 14px; bottom: 14px; }
+.call-pip--tr { right: 14px; top: 14px; }
+.call-pip--tl { left: 14px; top: 14px; }
+.call-pip__hint {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.call-pip:hover .call-pip__hint {
+  opacity: 1;
+}
+
+/* Floating reactions */
+.call-reactions {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 6;
+}
+.call-reaction {
+  position: absolute;
+  bottom: 10px;
+  font-size: 44px;
+  animation: call-reaction-float 3.2s ease-out forwards;
+}
+@keyframes call-reaction-float {
+  0% {
+    transform: translateY(0) scale(0.6);
+    opacity: 0;
+  }
+  12% {
+    transform: translateY(-40px) scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-60vh) scale(1);
+    opacity: 0;
+  }
+}
+
+/* Bottom control bar */
+.call-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+}
+.call-bar__group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+.call-bar__group--center {
+  justify-content: center;
+}
+.call-bar__group--right {
+  justify-content: flex-end;
+}
+.call-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 56px;
+  min-width: 84px;
+  padding: 0 22px;
+  border-radius: 28px;
+  background: #2e3030;
+  color: #fff;
+  font-weight: 500;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+.call-pill:hover {
+  background: #3a3c3c;
+}
+.call-pill:active {
+  transform: scale(0.97);
+}
+/* WhatsApp: a white pill means "off" for camera/mic. */
+.call-pill--toggle {
+  min-width: 96px;
+}
+.call-pill--toggle:not(.is-on) {
+  background: #fff;
+  color: #111;
+}
+.call-pill--end,
+.call-pill--decline {
+  background: #ea0038;
+}
+.call-pill--end:hover,
+.call-pill--decline:hover {
+  background: #c8002f;
+}
+.call-pill--end {
+  min-width: 104px;
+}
+.call-pill--accept {
+  background: var(--accent);
+  color: #0b141a;
+}
+.call-pill--accept:hover {
+  background: var(--accent-strong);
+}
+.call-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  color: #fff;
+  transition: background-color 0.15s ease;
+}
+.call-icon:hover:not(:disabled),
+.call-icon.is-active {
+  background: rgba(255, 255, 255, 0.12);
+}
+.call-icon:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.call-icon__min {
+  width: 18px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-radius: 3px;
+  box-shadow: inset 0 -5px 0 -3px currentColor;
+}
+.call-bar__react {
+  position: relative;
+}
+.call-bar__picker {
+  position: absolute;
+  bottom: 58px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 30px;
+  background: #2e3030;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.call-bar__picker button {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-size: 24px;
+  transition: transform 0.12s ease;
+}
+.call-bar__picker button:hover {
+  transform: scale(1.25);
+}
+
+/* Incoming call card (bottom-left like WhatsApp Web) */
+.call-incoming {
+  position: fixed;
+  left: 84px;
+  bottom: 20px;
+  z-index: 1350;
+  width: 380px;
+  max-width: calc(100vw - 24px);
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--panel-raised);
+  color: var(--text);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  animation: incoming-in 0.25s ease;
+}
+@keyframes incoming-in {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+}
+.call-incoming__top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.call-incoming__top .avatar {
+  animation: ring 1.4s ease-in-out infinite;
+}
+.call-incoming__who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.call-incoming__who strong {
+  font-size: 17px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.call-incoming__who span {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.call-incoming__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+.call-incoming__actions .call-pill {
+  height: 44px;
+  min-width: 0;
+  padding: 0 20px;
+}
+@keyframes ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(33, 192, 99, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 14px rgba(33, 192, 99, 0);
+  }
+}
+
+/* Minimized call bar */
+.call-mini {
+  position: fixed;
+  left: 84px;
+  bottom: 20px;
+  z-index: 1350;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 380px;
+  max-width: calc(100vw - 24px);
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--panel-raised);
+  color: var(--text);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+}
+.call-mini__who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  color: inherit;
+}
+.call-mini__who strong {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.call-mini__who span {
+  color: var(--accent);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+.call-mini__btn {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--hover-bg);
+  color: var(--text);
+}
+.call-mini__btn.is-off {
+  background: #fff;
+  color: #111;
+}
+.call-mini__btn--end {
+  background: #ea0038;
+  color: #fff;
+}
+
+@media (max-width: 760px) {
+  .call-screen__stage {
+    margin: 0;
+    border-radius: 0;
+  }
+  .call-pip {
+    width: 112px;
+    aspect-ratio: 3 / 4;
+  }
+  .call-bar {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .call-bar__group,
+  .call-bar__group--right {
+    flex: none;
+  }
+  .call-pill {
+    height: 50px;
+    min-width: 60px;
+    padding: 0 16px;
+  }
+  .call-incoming,
+  .call-mini {
+    left: 12px;
+    right: 12px;
+    bottom: 76px;
+    width: auto;
+  }
+}
+
+/* ---------------------------------------------------------------- group calls */
+.gcall__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px 4px;
+  flex: none;
+}
+.gcall__title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.gcall__title strong {
+  font-size: 17px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gcall__title span {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+.gcall__warning {
+  align-self: center;
+  margin: 4px 0 0 !important;
+}
+.gcall__stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin: 8px 12px 0;
+}
+.gcall__grid {
+  height: 100%;
+  display: grid;
+  gap: 8px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.gcall__grid--1 {
+  grid-template: 1fr / 1fr;
+}
+.gcall__grid--2 {
+  grid-template: 1fr / 1fr 1fr;
+}
+.gcall__grid--3,
+.gcall__grid--4 {
+  grid-template: 1fr 1fr / 1fr 1fr;
+}
+.gcall__grid--3 > :last-child {
+  grid-column: span 2;
+}
+/* 5-8 people: two columns, two rows on screen, scroll for the rest. */
+.gcall__grid--many {
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: calc(50% - 4px);
+}
+.gcall-tile {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #2a2c2c;
+  transition: box-shadow 0.15s ease;
+}
+.gcall-tile.is-speaking {
+  box-shadow: inset 0 0 0 3px var(--accent);
+}
+.gcall-tile.has-video .call-video {
+  position: absolute;
+  inset: 0;
+}
+.gcall-tile__center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.gcall-tile__status {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: var(--fs-sm);
+}
+.gcall-tile__label {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  max-width: calc(100% - 16px);
+  padding: 3px 9px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.5);
+  font-size: var(--fs-sm);
+}
+.gcall-tile__label span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gcall-tile__label svg {
+  flex: none;
+}
+.gcall-tile__badge {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.55);
+  font-size: var(--fs-xs);
+}
+.gcall-sheet {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  width: min(340px, 100%);
+  border-radius: 14px;
+  background: var(--panel-raised);
+  color: var(--text);
+  box-shadow: -8px 0 28px rgba(0, 0, 0, 0.45);
+  animation: fade-in 0.15s ease;
+}
+.gcall-sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 8px 8px 18px;
+}
+.gcall-sheet__head strong {
+  font-weight: 500;
+  font-size: 16px;
+}
+.gcall-sheet__list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 8px 12px;
+}
+.gcall-sheet__list h4 {
+  margin: 12px 10px 6px;
+  color: var(--accent);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+.gcall-sheet__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  color: var(--text);
+}
+.gcall-sheet__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Green "ongoing group call" banner at the top of a group chat. */
+.gcall-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  border-bottom: 1px solid var(--divider);
+  flex: none;
+}
+.gcall-banner__icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--badge-text);
+  flex: none;
+}
+.gcall-banner__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.gcall-banner__text strong {
+  font-weight: 500;
+}
+.gcall-banner__text span {
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gcall-join {
+  flex: none;
+  padding: 6px 16px;
+  border-radius: 18px;
+  background: var(--accent);
+  color: var(--badge-text);
+  font-weight: 500;
+  font-size: var(--fs-sm);
+}
+.gcall-join:hover {
+  background: var(--accent-strong);
+}
+.gcall-join--sm {
+  padding: 2px 12px;
+  font-size: var(--fs-xs);
+  line-height: 20px;
+}
+.chat-item__ongoing {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: var(--accent);
+}
+.chat-item__ongoing span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .gcall__stage {
+    margin: 6px 6px 0;
+  }
+  .gcall__grid {
+    gap: 6px;
+  }
+  /* Phone portrait: two people stack vertically. */
+  .gcall__grid--2 {
+    grid-template: 1fr 1fr / 1fr;
+  }
+  .gcall__grid--many {
+    grid-auto-rows: calc(33.333% - 4px);
+  }
+  .gcall-sheet {
+    border-radius: 14px 14px 0 0;
+    top: auto;
+    width: 100%;
+    max-height: 75%;
+  }
+}

@@ -1,6 +1,19 @@
+import os
+import uuid
+
 from django.db import models
 
+from .attachment import PRIVATE_MEDIA_DIR
 from .message import Message
+
+
+def voice_upload_to(instance, filename):
+    """View once voice messages are private, like view once photos."""
+    message = getattr(instance, "message", None)
+    if message is not None and message.is_view_once:
+        extension = os.path.splitext(filename)[1].lower()[:10]
+        return f"{PRIVATE_MEDIA_DIR}/view_once/{uuid.uuid4().hex}{extension}"
+    return f"chat/voice/{filename}"
 
 
 class VoiceNote(models.Model):
@@ -15,7 +28,7 @@ class VoiceNote(models.Model):
     )
 
     audio = models.FileField(
-        upload_to="chat/voice/",
+        upload_to=voice_upload_to,
     )
 
     duration = models.PositiveIntegerField(
@@ -41,4 +54,4 @@ class VoiceNote(models.Model):
 
     def __str__(self):
 
-        return f"Voice #{self.message_id}"
+        return f"Voice #{self.message_id}"

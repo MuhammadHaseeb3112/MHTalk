@@ -1,0 +1,43 @@
+name: Deploy
+
+# Continuous deployment: after the CI workflow passes on main, SSH into the
+# server and run deploy/deploy.sh (build, restart, health check, automatic
+# rollback), then check the live site.
+#
+# Off until you turn it on. In the GitHub repository:
+#   Settings → Secrets and variables → Actions
+#   Secrets:   DEPLOY_HOST (server IP), DEPLOY_USER (ubuntu), DEPLOY_SSH_KEY (private key)
+#   Variables: DEPLOY_ENABLED = true, DEPLOY_URL = https://your-domain
+# See docs/DEPLOY_ORACLE.md, "Automatic deploys".
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      vars.DEPLOY_ENABLED == 'true' &&
+      (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Deploy on the server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          command_timeout: 25m
+          script: cd ~/whatsup && bash deploy/deploy.sh
+
+      - name: Check the live site
+        if: vars.DEPLOY_URL != ''
+        run: curl -fsS --retry 10 --retry-delay 6 --retry-all-errors "${{ vars.DEPLOY_URL }}/api/health/"

@@ -1,5 +1,5 @@
+import re
 from django.conf import settings
-from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import (
@@ -8,8 +8,10 @@ from drf_spectacular.views import (
     SpectacularRedocView,
 )
 
-urlpatterns = [
+from .health import health
 
+urlpatterns = [
+    path("api/health/", health, name="health"),
 
     path(
         "api/schema/",
@@ -53,11 +55,26 @@ urlpatterns = [
         "api/calls/",
         include("apps.calls.urls"),
     ),
+
+    path(
+        "api/notifications/",
+        include("apps.notifications.urls"),
+    ),
 ]
 
-if settings.DEBUG:
-    urlpatterns += static(
-        settings.MEDIA_URL,
-        document_root=settings.MEDIA_ROOT,
-    )
+if settings.DEBUG or getattr(settings, "WHATSUP_SERVE_MEDIA", False):
+    # Uploads are normally served by the reverse proxy (Caddy) or object
+    # storage in production; WHATSUP_SERVE_MEDIA=1 lets Django do it when
+    # there is no proxy. Range-aware so videos and voice notes can play and seek in development.
+    from django.urls import re_path
+
+    from .media_views import serve_media
+
+    urlpatterns += [
+        re_path(
+            r"^%s(?P<path>.*)$" % re.escape(settings.MEDIA_URL.lstrip("/")),
+            serve_media,
+            {"document_root": settings.MEDIA_ROOT},
+        ),
+    ]
 

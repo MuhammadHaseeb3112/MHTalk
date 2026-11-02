@@ -1,0 +1,281 @@
+/* ---------------------------------------------------------------- composer */
+.composer {
+  position: relative;
+  flex: none;
+  padding: 6px 14px 10px;
+  background: var(--chat-bg);
+  z-index: 6;
+}
+.composer--disabled {
+  padding: 18px;
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--panel-raised);
+  border-top: 1px solid var(--divider);
+}
+.composer__row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.composer__pill {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  min-height: 52px;
+  padding: 6px 6px;
+  border-radius: 28px;
+  background: var(--panel-raised);
+}
+.composer__pill .icon-btn {
+  width: 40px;
+  height: 40px;
+}
+.composer__pill .icon-btn.is-rotated svg {
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+.composer__input {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  max-height: 140px;
+  padding: 10px 8px;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 20px;
+}
+.composer__input::placeholder {
+  color: var(--text-muted);
+}
+.send-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--badge-text);
+  flex: none;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+.send-btn:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+.send-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.send-btn svg {
+  margin-left: 2px;
+}
+
+.composer__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  padding: 6px 6px 6px 10px;
+  border-radius: 14px;
+  background: var(--panel-raised);
+  animation: bar-in 0.15s ease-out;
+}
+@keyframes bar-in {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+}
+.composer__bar .quote {
+  margin: 0;
+  background: var(--quote-bg);
+}
+.composer__bar--edit {
+  color: var(--accent);
+}
+.composer__bar-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.composer__bar-title {
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+.composer__bar-text {
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------------------------------------------------------------- recorder */
+.recorder {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 6px 6px 6px 8px;
+  border-radius: 28px;
+  background: var(--panel-raised);
+  animation: bar-in 0.15s ease-out;
+}
+.recorder__dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--danger);
+  animation: pulse 1s ease-in-out infinite;
+  flex: none;
+}
+.recorder__dot.is-paused {
+  animation: none;
+  background: var(--text-muted);
+}
+.recorder__time {
+  min-width: 42px;
+  font-variant-numeric: tabular-nums;
+}
+.recorder__wave {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  height: 32px;
+  overflow: hidden;
+}
+.recorder__wave span {
+  width: 3px;
+  min-height: 3px;
+  border-radius: 2px;
+  background: var(--icon);
+  flex: none;
+}
+.recorder .recorder__resume {
+  color: var(--danger);
+}
+/* While paused you just listen back: no file icon, like WhatsApp. */
+.recorder__preview .audio__file-icon {
+  display: none;
+}
+.recorder__preview {
+  flex: 1;
+  min-width: 0;
+}
+.recorder__preview .audio {
+  width: 100%;
+}
+
+/* ---------------------------------------------------------------- emoji picker */
+.emoji-picker {
+  display: flex;
+  flex-direction: column;
+  width: 400px;
+  height: 380px;
+  max-width: calc(100vw - 24px);
+  border-radius: 18px;
+  background: var(--menu-bg);
+  box-shadow: var(--shadow-menu);
+  overflow: hidden;
+  animation: menu-in 0.12s ease-out;
+  z-index: 50;
+}
+.emoji-picker--composer {
+  position: absolute;
+  left: 14px;
+  bottom: calc(100% + 4px);
+  width: min(520px, calc(100% - 28px));
+}
+.emoji-picker--caption,
+.emoji-picker--field {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+}
+.emoji-picker--field {
+  top: calc(100% + 6px);
+  bottom: auto;
+  width: 340px;
+}
+.emoji-picker--editor,
+.emoji-picker--status {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+}
+.emoji-picker__tabs {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 10px 0;
+  border-bottom: 1px solid var(--divider);
+}
+.emoji-picker__tabs button {
+  display: grid;
+  place-items: center;
+  flex: 1;
+  height: 40px;
+  color: var(--icon);
+  font-size: 18px;
+  border-bottom: 3px solid transparent;
+  filter: grayscale(0.6);
+}
+.emoji-picker__tabs button.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
+  filter: none;
+}
+.emoji-picker__search {
+  padding: 10px 0 6px;
+}
+.emoji-picker__search .search-input {
+  height: 36px;
+}
+.emoji-picker__grid {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 10px 10px;
+}
+.emoji-picker__section h4 {
+  margin: 10px 4px 6px;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+.emoji-picker__cells {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+}
+.emoji-picker__cells button {
+  display: grid;
+  place-items: center;
+  height: 40px;
+  border-radius: 8px;
+  font-size: 26px;
+  line-height: 1;
+}
+.emoji-picker__cells button:hover {
+  background: var(--hover-bg);
+}
+.emoji-picker__empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 24px;
+}
+
+@media (max-width: 900px) {
+  .composer {
+    padding: 4px 6px 8px;
+  }
+  .emoji-picker--composer {
+    left: 6px;
+    width: calc(100% - 12px);
+  }
+}

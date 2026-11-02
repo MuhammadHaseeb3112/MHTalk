@@ -8,11 +8,15 @@ from .views import (
     StartCallAPIView,
     HoldCallAPIView,
     ResumeCallAPIView,
+    MissedCallsAPIView,
+    IceServersAPIView,
+    ActiveCallsAPIView,
 )
 
 app_name = "calls"
 
 urlpatterns = [
+    path("ice-servers/", IceServersAPIView.as_view(), name="ice-servers"),
 
     path(
         "start/",
@@ -36,6 +40,18 @@ urlpatterns = [
         "<int:pk>/end/",
         EndCallAPIView.as_view(),
         name="end-call",
+    ),
+
+    path(
+        "missed/",
+        MissedCallsAPIView.as_view(),
+        name="missed-calls",
+    ),
+
+    path(
+        "active/",
+        ActiveCallsAPIView.as_view(),
+        name="active-calls",
     ),
 
     path(

@@ -420,3 +420,12 @@ class AttachmentAdmin(admin.ModelAdmin):
     date_hierarchy = "uploaded_at"
 
     empty_value_display = "-"
+
+# Per-user chat clear markers are useful for support/debugging.
+from apps.chat.models import ChatClear
+
+@admin.register(ChatClear)
+class ChatClearAdmin(admin.ModelAdmin):
+    list_display = ("room", "user", "cleared_at")
+    list_filter = ("cleared_at",)
+    search_fields = ("user__phone_number", "room__name")

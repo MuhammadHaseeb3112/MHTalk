@@ -207,7 +207,7 @@ class AttachmentModelTest(TestCase):
 
         self.assertEqual(
             attachment.mime_type,
-            "",
+            "image/jpeg",
         )
 
         self.assertGreater(

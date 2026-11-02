@@ -1,0 +1,497 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Copy, Download, Forward, Info, MessageSquare, Pencil, Phone, Pin, PinOff, Reply, Smile, Star, StarOff, Trash2, CheckSquare, UserPlus, Video, X } from "lucide-react";
+import { errorMessage, mediaUrl } from "../../api/client";
+import { contactsApi } from "../../api/endpoints";
+import { formatPhone, phoneDigits } from "../../utils/phone";
+import { callUser } from "../calls/callUser";
+import { useMediaQuery } from "../../hooks";
+import { toast } from "../../services/toast";
+import { applyMessagePatch, openChatWith, reactTo, retryMessage, sendFile, toggleStar, togglePinMessage, votePoll } from "../../store/actions";
+import { getState, useStore } from "../../store/store";
+import { attachmentKind, contactsByUser, displayUserName, groupAbilities, isSavedContact, messageKind, profileName, roomTitle } from "../../utils/messages";
+import { askBlock } from "../chat-list/roomMenu";
+import { IconButton, Menu } from "../common/ui";
+import { useApp } from "../layout/AppContext";
+import { useCalls } from "../calls/callContext";
+import GroupCallBanner from "../calls/GroupCallBanner";
+import CameraCapture from "../media/CameraCapture";
+import Lightbox from "../media/Lightbox";
+import MediaComposer from "../media/MediaComposer";
+import { normalizeFiles, validateFiles } from "../../utils/files";
+import { canDeleteForEveryone, canEdit } from "../../utils/rules";
+import Composer from "./Composer";
+import ConversationHeader from "./ConversationHeader";
+import MessageList from "./MessageList";
+import PinnedBar from "./PinnedBar";
+import ReactionPicker from "./ReactionPicker";
+import { DeleteMessagesDialog, ForwardDialog, ReactionsDialog } from "./dialogs";
+import { DisappearingDialog, PollVotesDialog, ViewOnceViewer } from "./FeatureDialogs";
+
+/**
+ * The open chat: header, message history, composer and every
+ * message-level interaction (menus, reactions, selection, media).
+ */
+export default function Conversation({ roomId }) {
+  const app = useApp();
+  const calls = useCalls();
+  const room = useStore((state) => state.rooms[roomId]);
+  const me = useStore((state) => state.me);
+  const contacts = useStore((state) => state.contacts);
+  const blocked = useStore((state) => (room?.otherUser ? state.blocked.includes(Number(room.otherUser.id)) : false));
+  const contactMap = useMemo(() => contactsByUser(contacts), [contacts]);
+  const unknownSender = Boolean(
+    room && !room.isGroup && room.otherUser && !room.otherUser.is_deleted && Number(room.otherUser.id) !== Number(me.id) && !isSavedContact(room.otherUser, contactMap),
+  );
+  const compact = useMediaQuery("(max-width: 900px)");
+
+  const [initialUnread] = useState(() => room?.unread || 0);
+  const [replyTo, setReplyTo] = useState(null);
+  const [editing, setEditing] = useState(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [menu, setMenu] = useState(null); // { anchor, message }
+  const [reacting, setReacting] = useState(null); // { anchor, message }
+  const [dialog, setDialog] = useState(null); // { type, messages | message }
+  const [composerFiles, setComposerFiles] = useState(null); // { files, mode }
+  const [camera, setCamera] = useState(false);
+  const [lightbox, setLightbox] = useState(null); // { items, index }
+  const [viewOnce, setViewOnce] = useState(null); // message being viewed once
+  const [disappearingOpen, setDisappearingOpen] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const dragDepth = useRef(0);
+
+  const title = room ? roomTitle(room, contactMap, me) : "";
+  const isMember = room && (!room.isGroup || room.participants.some((p) => Number(p.user?.id) === Number(me.id)));
+  let composerDisabledReason = "";
+  if (room && !isMember) composerDisabledReason = "You can't send messages to this group because you're no longer a participant.";
+  else if (room?.isGroup && !groupAbilities(room, me.id).canSend) composerDisabledReason = "Only admins can send messages";
+  else if (room && !room.isGroup && (room.otherUser === null || room.otherUser?.is_deleted)) composerDisabledReason = "This account no longer exists.";
+
+  const nameOf = useCallback(
+    (userId) => {
+      if (Number(userId) === Number(me.id)) return "You";
+      const user = room?.participants.find((p) => Number(p.user?.id) === Number(userId))?.user;
+      return user ? displayUserName(user, contactMap) : "Unknown";
+    },
+    [room?.participants, contactMap, me.id],
+  );
+  const userOf = useCallback(
+    (userId) => (Number(userId) === Number(me.id) ? me : room?.participants.find((p) => Number(p.user?.id) === Number(userId))?.user || null),
+    [room?.participants, me],
+  );
+
+  // Header menu / contact & group info open the timer dialog through this event.
+  useEffect(() => {
+    const handler = (event) => Number(event.detail) === Number(roomId) && setDisappearingOpen(true);
+    window.addEventListener("whatsup:disappearing", handler);
+    return () => window.removeEventListener("whatsup:disappearing", handler);
+  }, [roomId]);
+
+  const messagesFor = useCallback(() => getState().messages[roomId]?.items || [], [roomId]);
+
+  const openInfo = useCallback(() => app.openDrawer(room?.isGroup ? "group" : "contact", { roomId }), [app, room?.isGroup, roomId]);
+
+  // Arrow-up in an empty composer edits your last message (like WhatsApp Web).
+  useEffect(() => {
+    const handler = () => {
+      const last = [...messagesFor()].reverse().find((message) => canEdit(message, me.id));
+      if (last) setEditing(last);
+    };
+    window.addEventListener("whatsup:edit-last", handler);
+    return () => window.removeEventListener("whatsup:edit-last", handler);
+  }, [messagesFor, me.id]);
+
+  useEffect(() => {
+    const onKey = (event) => {
+      if (event.key !== "Escape") return;
+      if (selectMode) {
+        setSelectMode(false);
+        setSelectedIds([]);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [selectMode]);
+
+  const pickFiles = useCallback(async (picked, mode) => {
+    const files = await normalizeFiles(picked);
+    // Photos saved without an extension don't show in the "Photos & videos"
+    // picker, so people find them through "Document". Treat those as photos.
+    const recovered = picked.every((file, index) => !file.type && files[index].type);
+    if (mode === "document" && recovered && files.every((file) => /^(image|video)\//.test(file.type))) mode = "media";
+    const accepted = validateFiles(files, mode === "media" ? "media" : mode === "audio" ? "audio" : "any");
+    if (accepted.length) setComposerFiles({ files: accepted, mode });
+  }, []);
+
+  const sendComposerItems = useCallback(
+    (items) => {
+      const reply = replyTo;
+      setComposerFiles(null);
+      setReplyTo(null);
+      items.forEach((item, index) => sendFile(roomId, item.file, { caption: item.caption, viewOnce: item.viewOnce, replyTo: index === 0 ? reply : undefined }));
+    },
+    [roomId, replyTo],
+  );
+
+  const openMedia = useCallback(
+    (message) => {
+      const items = [];
+      messagesFor().forEach((item) => {
+        // View once media never joins the gallery (it has no URL anyway).
+        if (item.is_deleted || item.is_view_once) return;
+        (item.attachments || []).forEach((attachment) => {
+          const kind = attachmentKind(attachment);
+          if (kind === "image" || kind === "video") items.push({ message: item, attachment });
+        });
+      });
+      const index = Math.max(0, items.findIndex((item) => item.message === message || (message.id && item.message.id === message.id)));
+      setLightbox({ items, index });
+    },
+    [messagesFor],
+  );
+
+  // Shared contact card: Message / Voice call / Video call / Add to contacts.
+  const [contactMenu, setContactMenu] = useState(null); // { anchor, items }
+  const handleContactCard = useCallback(
+    (message, payload) => {
+      const card = typeof message.content === "object" && message.content ? message.content : {};
+      const phone = card.phone;
+      if (!phone) return;
+      const resolve = async () => {
+        try {
+          const found = await contactsApi.lookup(phone);
+          if (found?.is_self) return found.user;
+          if (!found?.user) throw new Error("missing");
+          return found.user;
+        } catch {
+          toast.error(`${card.name || phone} isn't on MHTalk.`);
+          return null;
+        }
+      };
+      const openChat = async () => {
+        const user = await resolve();
+        if (!user) return;
+        try {
+          app.openRoom(await openChatWith(user));
+        } catch (error) {
+          toast.error(errorMessage(error));
+        }
+      };
+      if (payload?.action === "message") {
+        openChat();
+        return;
+      }
+      const isMe = phoneDigits(getState().me?.phone_number) === phoneDigits(phone);
+      const saved = isMe || (getState().contacts || []).some((contact) => phoneDigits(contact.contact_user?.phone_number) === phoneDigits(phone));
+      const event = payload?.event;
+      const target = event?.currentTarget;
+      const anchor = target?.getBoundingClientRect ? target : { left: event?.clientX || 0, right: event?.clientX || 0, top: event?.clientY || 0, bottom: event?.clientY || 0 };
+      setContactMenu({
+        anchor,
+        items: [
+          { label: `Message ${card.name || formatPhone(phone)}`, icon: MessageSquare, onClick: openChat },
+          isMe ? null : { label: "Voice call", icon: Phone, onClick: async () => { const user = await resolve(); if (user) callUser(user, "audio", calls.startCall); } },
+          isMe ? null : { label: "Video call", icon: Video, onClick: async () => { const user = await resolve(); if (user) callUser(user, "video", calls.startCall); } },
+          saved ? null : { label: "Add to contacts", icon: UserPlus, onClick: () => app.pushPanel("newContact", { initialPhone: phone }) },
+          { label: "Copy number", icon: Copy, onClick: () => navigator.clipboard?.writeText(formatPhone(phone)).then(() => toast("Number copied")) },
+        ].filter(Boolean),
+      });
+    },
+    [app, calls],
+  );
+
+  const handleAction = useCallback(
+    (type, message, payload) => {
+      switch (type) {
+        case "menu": {
+          const anchor = payload?.currentTarget && payload.type === "click" ? payload.currentTarget : { left: payload.clientX, right: payload.clientX, top: payload.clientY, bottom: payload.clientY };
+          setMenu({ anchor, message });
+          break;
+        }
+        case "react":
+          setReacting({ anchor: payload.currentTarget, message });
+          break;
+        case "reactions":
+          setDialog({ type: "reactions", message });
+          break;
+        case "reply":
+          setEditing(null);
+          setReplyTo(message);
+          break;
+        case "forward":
+          setDialog({ type: "forward", messages: [message] });
+          break;
+        case "openMedia":
+          openMedia(message);
+          break;
+        case "retry":
+          retryMessage(roomId, message);
+          break;
+        case "toggleSelect":
+          if (!message.id) return;
+          setSelectedIds((current) => (current.includes(message.id) ? current.filter((id) => id !== message.id) : [...current, message.id]));
+          break;
+        case "call":
+          calls.startCall(room, payload.type);
+          break;
+        case "contact":
+          handleContactCard(message, payload);
+          break;
+        case "vote":
+          if (!isMember) toast.error("You can't vote in a group you left.");
+          else votePoll(roomId, message, payload.optionId);
+          break;
+        case "pollVotes":
+          setDialog({ type: "pollVotes", message });
+          break;
+        case "viewOnce":
+          setViewOnce(message);
+          break;
+        case "disappearing":
+          setDisappearingOpen(true);
+          break;
+        case "mention": {
+          const user = getState().rooms[roomId]?.participants.find((p) => Number(p.user?.id) === Number(payload.userId))?.user;
+          if (!user || Number(user.id) === Number(me.id)) return;
+          openChatWith(user).then((id) => app.openRoom(id)).catch((error) => toast.error(errorMessage(error)));
+          break;
+        }
+        default:
+          break;
+      }
+    },
+    [openMedia, roomId, calls, room, handleContactCard, isMember, me.id, app],
+  );
+
+  function messageMenuItems(message) {
+    const kind = messageKind(message);
+    const isOwn = Number(message.sender?.id) === Number(me.id);
+    const viewOnceMessage = kind === "view_once";
+    const attachment = viewOnceMessage ? null : message.attachments?.[0];
+    const text = kind === "text" || ((kind === "image" || kind === "video") && message.content) ? message.content : "";
+    // View once: no copy / download / forward / star / pin (like WhatsApp).
+    return [
+      isOwn && message.id ? { label: "Message info", icon: Info, onClick: () => app.openDrawer("messageInfo", { roomId, messageId: message.id }) } : null,
+      isMember ? { label: "Reply", icon: Reply, onClick: () => handleAction("reply", message) } : null,
+      text
+        ? {
+            label: "Copy",
+            icon: Copy,
+            onClick: () =>
+              navigator.clipboard?.writeText(text).then(
+                () => toast("Message copied"),
+                () => toast.error("Couldn't copy."),
+              ),
+          }
+        : null,
+      isMember ? { label: "React", icon: Smile, onClick: () => setReacting({ anchor: menu?.anchor, message }) } : null,
+      attachment || message.voice_note
+        ? {
+            label: "Download",
+            icon: Download,
+            onClick: () => {
+              const link = document.createElement("a");
+              link.href = mediaUrl(attachment?.file || message.voice_note?.audio);
+              link.download = attachment?.file_name || "voice-message";
+              link.target = "_blank";
+              link.rel = "noopener";
+              link.click();
+            },
+          }
+        : null,
+      kind !== "call" && !viewOnceMessage ? { label: "Forward", icon: Forward, onClick: () => setDialog({ type: "forward", messages: [message] }) } : null,
+      isMember && !viewOnceMessage ? (message.is_pinned ? { label: "Unpin", icon: PinOff, onClick: () => togglePinMessage(roomId, message) } : { label: "Pin", icon: Pin, onClick: () => togglePinMessage(roomId, message) }) : null,
+      viewOnceMessage ? null : message.is_starred ? { label: "Unstar", icon: StarOff, onClick: () => toggleStar(roomId, [message], false) } : { label: "Star", icon: Star, onClick: () => toggleStar(roomId, [message], true) },
+      canEdit(message, me.id) ? { label: "Edit", icon: Pencil, onClick: () => { setReplyTo(null); setEditing(message); } } : null,
+      { label: "Select", icon: CheckSquare, onClick: () => { setSelectMode(true); setSelectedIds([message.id]); } },
+      { divider: true },
+      { label: "Delete", icon: Trash2, danger: true, onClick: () => setDialog({ type: "delete", messages: [message] }) },
+    ].filter(Boolean);
+  }
+
+  if (!room) return null;
+
+  const selectedMessages = messagesFor().filter((message) => selectedIds.includes(message.id));
+  const forwardable = selectedMessages.filter((message) => !message.is_view_once);
+  const starrable = forwardable;
+
+  return (
+    <section
+      className={`conversation ${composerFiles || camera ? "has-media-composer" : ""}`}
+      onDragEnter={(event) => {
+        if (!event.dataTransfer?.types?.includes("Files")) return;
+        dragDepth.current += 1;
+        setDragging(true);
+      }}
+      onDragLeave={() => {
+        dragDepth.current = Math.max(0, dragDepth.current - 1);
+        if (!dragDepth.current) setDragging(false);
+      }}
+      onDragOver={(event) => event.dataTransfer?.types?.includes("Files") && event.preventDefault()}
+      onDrop={(event) => {
+        event.preventDefault();
+        dragDepth.current = 0;
+        setDragging(false);
+        const files = [...(event.dataTransfer?.files || [])];
+        if (!files.length) return;
+        normalizeFiles(files).then((typed) => {
+          const allMedia = typed.every((file) => /^(image|video)\//.test(file.type));
+          pickFiles(typed, allMedia ? "media" : "document");
+        });
+      }}
+    >
+      <ConversationHeader
+        room={room}
+        title={title}
+        compact={compact}
+        onOpenInfo={openInfo}
+        onSearch={() => app.openDrawer("search", { roomId })}
+        onSelect={() => setSelectMode(true)}
+        onStarred={() => app.pushPanel("starred", { roomId })}
+        onClose={app.closeRoom}
+        onCall={(type) => calls.startCall(room, type)}
+      />
+
+      <GroupCallBanner room={room} />
+      <PinnedBar room={room} me={me} canPin={isMember && !blocked} />
+
+      <div className="conversation__body">
+        {unknownSender ? (
+          <div className="unknown-banner" role="region" aria-label="Unknown number">
+            <div className="unknown-banner__text">
+              {profileName(room.otherUser) ? <strong>~ {profileName(room.otherUser)}</strong> : null}
+              <span>Not a contact</span>
+            </div>
+            <div className="unknown-banner__actions">
+              <button type="button" className="btn btn--outline-danger" onClick={() => askBlock(room, title, blocked)}>
+                {blocked ? "Unblock" : "Block"}
+              </button>
+              <button
+                type="button"
+                className="btn btn--outline"
+                onClick={() => app.pushPanel("newContact", { initialPhone: room.otherUser.phone_number })}
+              >
+                Add to contacts
+              </button>
+            </div>
+          </div>
+        ) : null}
+        <MessageList
+          room={room}
+          me={me}
+          contactMap={contactMap}
+          selectMode={selectMode}
+          selectedIds={selectedIds}
+          onAction={handleAction}
+          initialUnread={initialUnread}
+        />
+        {composerFiles ? (
+          <MediaComposer initialFiles={composerFiles.files} mode={composerFiles.mode} title={title} onSend={sendComposerItems} onClose={() => setComposerFiles(null)} />
+        ) : null}
+        {camera ? (
+          <CameraCapture
+            onClose={() => setCamera(false)}
+            onCapture={(file) => {
+              setCamera(false);
+              setComposerFiles({ files: [file], mode: "media" });
+            }}
+          />
+        ) : null}
+        {dragging ? (
+          <div className="drop-zone">
+            <div>Drop files to send to {title}</div>
+          </div>
+        ) : null}
+      </div>
+
+      {selectMode ? (
+        <div className="selection-bar">
+          <IconButton icon={X} label="Cancel selection" onClick={() => { setSelectMode(false); setSelectedIds([]); }} />
+          <span className="selection-bar__count">{selectedIds.length} selected</span>
+          <div className="selection-bar__actions">
+            <IconButton icon={Star} label="Star" disabled={!starrable.length} onClick={() => toggleStar(roomId, starrable, !starrable.every((m) => m.is_starred))} />
+            <IconButton icon={Copy} label="Copy" disabled={!selectedIds.length} onClick={() => {
+              const text = selectedMessages.filter((m) => m.content && typeof m.content === "string" && !m.content.startsWith("__WHATSUP_")).map((m) => m.content).join("\n");
+              if (text) navigator.clipboard?.writeText(text).then(() => toast("Copied"));
+            }} />
+            <IconButton icon={Forward} label="Forward" disabled={!forwardable.length || forwardable.length !== selectedMessages.length} onClick={() => setDialog({ type: "forward", messages: forwardable })} />
+            <IconButton icon={Trash2} label={canDeleteForEveryone(selectedMessages, me.id) ? "Delete" : "Delete for me"} disabled={!selectedIds.length} onClick={() => setDialog({ type: "delete", messages: selectedMessages })} />
+          </div>
+        </div>
+      ) : (
+        <Composer
+          key={roomId}
+          room={room}
+          replyTo={replyTo}
+          editing={editing}
+          nameOf={nameOf}
+          blocked={blocked}
+          disabledReason={composerDisabledReason}
+          onClearReply={() => setReplyTo(null)}
+          onClearEdit={() => setEditing(null)}
+          onPickFiles={pickFiles}
+          onOpenCamera={() => setCamera(true)}
+        />
+      )}
+
+      {contactMenu ? <Menu anchor={contactMenu.anchor} items={contactMenu.items} onClose={() => setContactMenu(null)} align="left" /> : null}
+      {menu ? <Menu anchor={menu.anchor} items={messageMenuItems(menu.message)} onClose={() => setMenu(null)} align={Number(menu.message.sender?.id) === Number(me.id) ? "right" : "left"} /> : null}
+      {reacting ? (
+        <ReactionPicker
+          anchor={reacting.anchor}
+          current={(reacting.message.reactions || []).find((r) => Number(r.user_id) === Number(me.id))?.emoji}
+          onPick={(emoji) => reactTo(roomId, reacting.message, emoji)}
+          onClose={() => setReacting(null)}
+        />
+      ) : null}
+      {dialog?.type === "delete" ? (
+        <DeleteMessagesDialog roomId={roomId} messages={dialog.messages} myId={me.id} onClose={() => setDialog(null)} onDone={() => { setSelectMode(false); setSelectedIds([]); }} />
+      ) : null}
+      {dialog?.type === "forward" ? (
+        <ForwardDialog messages={dialog.messages.filter((m) => m.id)} onClose={() => setDialog(null)} onDone={() => { setSelectMode(false); setSelectedIds([]); }} />
+      ) : null}
+      {dialog?.type === "reactions" ? (
+        <ReactionsDialog
+          message={messagesFor().find((m) => m.id === dialog.message.id) || dialog.message}
+          room={room}
+          onClose={() => setDialog(null)}
+          onRemoveMine={() => {
+            const mine = (dialog.message.reactions || []).find((r) => Number(r.user_id) === Number(me.id));
+            if (mine) reactTo(roomId, dialog.message, mine.emoji);
+          }}
+        />
+      ) : null}
+      {dialog?.type === "pollVotes" ? (
+        <PollVotesDialog
+          message={messagesFor().find((m) => m.id === dialog.message.id) || dialog.message}
+          nameOf={nameOf}
+          userOf={userOf}
+          onClose={() => setDialog(null)}
+        />
+      ) : null}
+      {disappearingOpen ? <DisappearingDialog room={room} canEdit={!room.isGroup || groupAbilities(room, me.id).canEditInfo} onClose={() => setDisappearingOpen(false)} /> : null}
+      {viewOnce ? (
+        <ViewOnceViewer
+          message={viewOnce}
+          nameOf={nameOf}
+          onOpened={() => {
+            const current = messagesFor().find((m) => m.id === viewOnce.id) || viewOnce;
+            const opened = [...new Set([...(current.view_once_opened_by || []).map(Number), Number(me.id)])];
+            applyMessagePatch(roomId, viewOnce.id, { view_once_opened_by: opened });
+          }}
+          onClose={() => setViewOnce(null)}
+        />
+      ) : null}
+      {lightbox ? (
+        <Lightbox
+          items={lightbox.items}
+          startIndex={lightbox.index}
+          nameOf={nameOf}
+          onClose={() => setLightbox(null)}
+          onForward={(message) => setDialog({ type: "forward", messages: [message] })}
+          onGoTo={(message) => window.dispatchEvent(new CustomEvent("whatsup:jump-to", { detail: message.id }))}
+        />
+      ) : null}
+    </section>
+  );
+}
