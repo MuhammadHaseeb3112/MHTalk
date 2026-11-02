@@ -1,3 +1,5 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import validate_email
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -250,7 +252,22 @@ class UpdateProfileAPIView(APIView):
             partial=True,
         )
 
+        new_email = None
+        if "email" in request.data:
+            new_email = str(request.data.get("email") or "").strip().lower()
+            if new_email:
+                try:
+                    validate_email(new_email)
+                except DjangoValidationError:
+                    return Response({"email": ["Enter a valid email address."]}, status=status.HTTP_400_BAD_REQUEST)
+                taken = User.objects.filter(email__iexact=new_email).exclude(pk=request.user.pk).exists()
+                if taken:
+                    return Response({"email": ["This email is already used by another account."]}, status=status.HTTP_400_BAD_REQUEST)
+
         if serializer.is_valid():
+            if new_email is not None:
+                request.user.email = new_email or None
+                request.user.save(update_fields=["email"])
             if remove_picture and profile.profile_picture:
                 profile.profile_picture.delete(save=False)
                 profile.profile_picture = None

@@ -62,9 +62,9 @@ urlpatterns = [
     ),
 ]
 
-if settings.DEBUG or getattr(settings, "WHATSUP_SERVE_MEDIA", False):
+if settings.DEBUG or getattr(settings, "MHTALK_SERVE_MEDIA", False):
     # Uploads are normally served by the reverse proxy (Caddy) or object
-    # storage in production; WHATSUP_SERVE_MEDIA=1 lets Django do it when
+    # storage in production; MHTALK_SERVE_MEDIA=1 lets Django do it when
     # there is no proxy. Range-aware so videos and voice notes can play and seek in development.
     from django.urls import re_path
 

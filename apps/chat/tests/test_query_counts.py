@@ -76,7 +76,7 @@ def seed(size, prefix):
     return me, private_room, group
 
 
-@override_settings(MEDIA_ROOT="/tmp/whatsup-test-media")
+@override_settings(MEDIA_ROOT="/tmp/mhtalk-test-media")
 class QueryCountTests(TestCase):
     ENDPOINTS = (
         "/api/accounts/contacts/",

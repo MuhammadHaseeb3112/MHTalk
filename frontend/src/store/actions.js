@@ -560,6 +560,7 @@ export async function toggleStar(roomId, messages, starred) {
   messages.forEach((message) => dispatch({ type: "messages/patch", roomId, id: message.id, patch: { is_starred: starred } }));
   try {
     await Promise.all(messages.map((message) => messageApi.star(message.id, starred)));
+    window.dispatchEvent(new Event("mhtalk:starred-changed"));
     toast(starred ? (messages.length > 1 ? "Messages starred" : "Message starred") : "Unstarred");
   } catch (error) {
     messages.forEach((message) => dispatch({ type: "messages/patch", roomId, id: message.id, patch: { is_starred: !starred } }));
@@ -573,7 +574,7 @@ export async function togglePinMessage(roomId, message) {
   try {
     await messageApi.pin(message.id, next);
     // The server keeps 3 pins per chat and may have unpinned the oldest one.
-    window.dispatchEvent(new CustomEvent("whatsup:pins-changed", { detail: { roomId } }));
+    window.dispatchEvent(new CustomEvent("mhtalk:pins-changed", { detail: { roomId } }));
     if (next) toast("Message pinned");
   } catch (error) {
     dispatch({ type: "messages/patch", roomId, id: message.id, patch: { is_pinned: !next } });

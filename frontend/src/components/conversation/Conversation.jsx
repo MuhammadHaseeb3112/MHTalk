@@ -26,6 +26,7 @@ import PinnedBar from "./PinnedBar";
 import ReactionPicker from "./ReactionPicker";
 import { DeleteMessagesDialog, ForwardDialog, ReactionsDialog } from "./dialogs";
 import { DisappearingDialog, PollVotesDialog, ViewOnceViewer } from "./FeatureDialogs";
+import StatusViewer from "../status/StatusViewer";
 
 /**
  * The open chat: header, message history, composer and every
@@ -56,6 +57,7 @@ export default function Conversation({ roomId }) {
   const [camera, setCamera] = useState(false);
   const [lightbox, setLightbox] = useState(null); // { items, index }
   const [viewOnce, setViewOnce] = useState(null); // message being viewed once
+  const [statusView, setStatusView] = useState(null); // { groups, statusId } from a status reaction card
   const [disappearingOpen, setDisappearingOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
   const dragDepth = useRef(0);
@@ -83,8 +85,8 @@ export default function Conversation({ roomId }) {
   // Header menu / contact & group info open the timer dialog through this event.
   useEffect(() => {
     const handler = (event) => Number(event.detail) === Number(roomId) && setDisappearingOpen(true);
-    window.addEventListener("whatsup:disappearing", handler);
-    return () => window.removeEventListener("whatsup:disappearing", handler);
+    window.addEventListener("mhtalk:disappearing", handler);
+    return () => window.removeEventListener("mhtalk:disappearing", handler);
   }, [roomId]);
 
   const messagesFor = useCallback(() => getState().messages[roomId]?.items || [], [roomId]);
@@ -97,8 +99,8 @@ export default function Conversation({ roomId }) {
       const last = [...messagesFor()].reverse().find((message) => canEdit(message, me.id));
       if (last) setEditing(last);
     };
-    window.addEventListener("whatsup:edit-last", handler);
-    return () => window.removeEventListener("whatsup:edit-last", handler);
+    window.addEventListener("mhtalk:edit-last", handler);
+    return () => window.removeEventListener("mhtalk:edit-last", handler);
   }, [messagesFor, me.id]);
 
   useEffect(() => {
@@ -247,6 +249,20 @@ export default function Conversation({ roomId }) {
         case "viewOnce":
           setViewOnce(message);
           break;
+        case "openStatus": {
+          // A reaction card points at a status: open it like WhatsApp does.
+          const statusId = Number(payload?.status_id);
+          const state = getState();
+          const ownGroup = { user: state.me, statuses: state.myStatuses };
+          const group = [ownGroup, ...state.statusFeed].find((item) => item.statuses?.some((status) => Number(status.id) === statusId));
+          if (!group) {
+            toast("This status is no longer available.");
+            break;
+          }
+          const statuses = [...group.statuses].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+          setStatusView({ groups: [{ ...group, statuses }], statusId });
+          break;
+        }
         case "disappearing":
           setDisappearingOpen(true);
           break;
@@ -411,7 +427,7 @@ export default function Conversation({ roomId }) {
           <div className="selection-bar__actions">
             <IconButton icon={Star} label="Star" disabled={!starrable.length} onClick={() => toggleStar(roomId, starrable, !starrable.every((m) => m.is_starred))} />
             <IconButton icon={Copy} label="Copy" disabled={!selectedIds.length} onClick={() => {
-              const text = selectedMessages.filter((m) => m.content && typeof m.content === "string" && !m.content.startsWith("__WHATSUP_")).map((m) => m.content).join("\n");
+              const text = selectedMessages.filter((m) => m.content && typeof m.content === "string" && !m.content.startsWith("__MHTALK_")).map((m) => m.content).join("\n");
               if (text) navigator.clipboard?.writeText(text).then(() => toast("Copied"));
             }} />
             <IconButton icon={Forward} label="Forward" disabled={!forwardable.length || forwardable.length !== selectedMessages.length} onClick={() => setDialog({ type: "forward", messages: forwardable })} />
@@ -470,6 +486,7 @@ export default function Conversation({ roomId }) {
         />
       ) : null}
       {disappearingOpen ? <DisappearingDialog room={room} canEdit={!room.isGroup || groupAbilities(room, me.id).canEditInfo} onClose={() => setDisappearingOpen(false)} /> : null}
+      {statusView ? <StatusViewer groups={statusView.groups} startStatusId={statusView.statusId} onClose={() => setStatusView(null)} /> : null}
       {viewOnce ? (
         <ViewOnceViewer
           message={viewOnce}
@@ -489,7 +506,7 @@ export default function Conversation({ roomId }) {
           nameOf={nameOf}
           onClose={() => setLightbox(null)}
           onForward={(message) => setDialog({ type: "forward", messages: [message] })}
-          onGoTo={(message) => window.dispatchEvent(new CustomEvent("whatsup:jump-to", { detail: message.id }))}
+          onGoTo={(message) => window.dispatchEvent(new CustomEvent("mhtalk:jump-to", { detail: message.id }))}
         />
       ) : null}
     </section>

@@ -9,7 +9,7 @@ export function canEdit(message, myId) {
       !message.is_deleted &&
       (message.message_type === "TEXT" || !message.message_type) &&
       !message.attachments?.length &&
-      !String(message.content || "").startsWith("__WHATSUP_") &&
+      !String(message.content || "").startsWith("__MHTALK_") &&
       Date.now() - new Date(message.created_at).getTime() < EDIT_WINDOW_MS,
   );
 }
@@ -20,7 +20,7 @@ export function canDeleteForEveryone(messages, myId) {
       Number(message.sender?.id) === Number(myId) &&
       !message.is_deleted &&
       message.id &&
-      !String(message.content || "").startsWith("__WHATSUP_GROUP_EVENT__") &&
+      !String(message.content || "").startsWith("__MHTALK_GROUP_EVENT__") &&
       Date.now() - new Date(message.created_at).getTime() < DELETE_WINDOW_MS,
   );
 }

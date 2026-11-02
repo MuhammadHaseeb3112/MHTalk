@@ -7,10 +7,11 @@ import { useObjectUrl } from "../../hooks";
 import { loadStatus } from "../../store/actions";
 import { useStore } from "../../store/store";
 import { toast } from "../../services/toast";
-import { IconButton, Spinner } from "../common/ui";
+import { IconButton, Modal, Spinner } from "../common/ui";
 import EmojiPicker from "../conversation/EmojiPicker";
 import ImageEditor from "../media/ImageEditor";
-import { getStatusPrivacy, STATUS_COLORS } from "./statusPrefs";
+import { getStatusPrivacy, setStatusPrivacy, STATUS_COLORS } from "./statusPrefs";
+import StatusPrivacyEditor from "./StatusPrivacyEditor";
 
 const FONTS = ["inherit", "Georgia, serif", "'Courier New', monospace", "'Trebuchet MS', sans-serif"];
 const LABELS = { CONTACTS: "My contacts", CONTACTS_EXCEPT: "My contacts except…", ONLY_SHARE_WITH: "Only share with…", EVERYONE: "Everyone" };
@@ -31,7 +32,8 @@ export default function StatusComposer({ initialFile, mode = "text", onClose }) 
   const [emojiOpen, setEmojiOpen] = useState(false);
   const emojiRef = useRef(null);
   const url = useObjectUrl(file);
-  const privacy = getStatusPrivacy(me.id);
+  const [privacy, setPrivacy] = useState(() => getStatusPrivacy(me.id));
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   const isText = mode === "text" && !file;
   const isVideo = file?.type.startsWith("video/");
 
@@ -142,13 +144,30 @@ export default function StatusComposer({ initialFile, mode = "text", onClose }) 
         ) : (
           <span className="status-composer__count">{700 - text.length}</span>
         )}
-        <span className="status-composer__privacy" title="Change it in Status → ⋮ → Status privacy">
+        <button type="button" className="status-composer__privacy" onClick={() => setPrivacyOpen(true)} title="Choose who can see this status">
           <Lock size={13} /> {LABELS[privacy.visibility]}
-        </span>
+        </button>
         <button type="button" className="fab" onClick={publish} disabled={busy} aria-label="Post status">
           {busy ? <span className="fab__progress">{progress ? `${progress}%` : <Spinner size={18} className="spinner--dark" />}</span> : <Send size={22} />}
         </button>
       </div>
+      {privacyOpen ? (
+        <Modal
+          title="Status privacy"
+          className="status-privacy-modal"
+          onClose={() => setPrivacyOpen(false)}
+          footer={<button type="button" className="btn btn--primary" onClick={() => setPrivacyOpen(false)}>Done</button>}
+        >
+          <StatusPrivacyEditor
+            value={privacy}
+            onChange={(next) => {
+              // Like WhatsApp: the choice also becomes the default for next time.
+              setPrivacy(next);
+              setStatusPrivacy(me.id, next);
+            }}
+          />
+        </Modal>
+      ) : null}
     </div>,
     document.body,
   );

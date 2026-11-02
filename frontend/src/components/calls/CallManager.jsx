@@ -821,15 +821,15 @@ export function CallProvider({ children }) {
         cleanup("ended", status === "MISSED" ? (session.initiator ? "No answer" : "Missed call") : status === "REJECTED" ? (session.group ? "No one answered" : "Call declined") : "Call ended");
       }
     };
-    window.addEventListener("whatsup:call-changed", handler);
-    return () => window.removeEventListener("whatsup:call-changed", handler);
+    window.addEventListener("mhtalk:call-changed", handler);
+    return () => window.removeEventListener("mhtalk:call-changed", handler);
   }, [cleanup]);
 
   // "Join" buttons outside the call context (chat list rows).
   useEffect(() => {
     const handler = (event) => joinCall(event.detail?.roomId);
-    window.addEventListener("whatsup:join-call", handler);
-    return () => window.removeEventListener("whatsup:join-call", handler);
+    window.addEventListener("mhtalk:join-call", handler);
+    return () => window.removeEventListener("mhtalk:join-call", handler);
   }, [joinCall]);
 
   useEffect(() => () => cleanup(), [cleanup]);

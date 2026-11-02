@@ -35,7 +35,7 @@ export default function AssistantPanel() {
                   <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">aistudio.google.com/apikey</a>
                 </li>
                 <li>
-                  In the backend <code>.env</code> add <code>WHATSUP_AI_API_KEY=your-key</code>
+                  In the backend <code>.env</code> add <code>MHTALK_AI_API_KEY=your-key</code>
                 </li>
                 <li>Restart the backend</li>
               </ol>

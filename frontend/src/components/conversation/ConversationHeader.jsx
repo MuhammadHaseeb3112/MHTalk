@@ -78,7 +78,7 @@ function ConversationHeader({ room, title, onOpenInfo, onSearch, onSelect, onClo
           label: "Disappearing messages",
           icon: Timer,
           hint: room.disappearingSeconds ? disappearingLabel(room.disappearingSeconds) : undefined,
-          onClick: () => window.dispatchEvent(new CustomEvent("whatsup:disappearing", { detail: room.id })),
+          onClick: () => window.dispatchEvent(new CustomEvent("mhtalk:disappearing", { detail: room.id })),
         }
       : null,
     room.isMuted

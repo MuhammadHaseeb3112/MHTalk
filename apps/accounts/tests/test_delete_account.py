@@ -23,7 +23,7 @@ def make_user(phone, name):
     return user
 
 
-@override_settings(MEDIA_ROOT="/tmp/whatsup-test-media")
+@override_settings(MEDIA_ROOT="/tmp/mhtalk-test-media")
 class DeleteAccountTests(TestCase):
     def setUp(self):
         self.alice = make_user("+923000006001", "Alice")

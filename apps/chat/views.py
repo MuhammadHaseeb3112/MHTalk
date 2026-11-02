@@ -57,6 +57,7 @@ from .models import (
 from .models import StarredMessage, Attachment, Reaction
 from .serializers import visible_messages_for_user, unread_messages_for_user, unread_mentions_for_user, with_message_relations, starred_ids_for
 from .serializers import (
+    last_reaction_previews,
     ChatRoomDetailSerializer,
     ChatRoomSerializer,
     MessageSerializer,
@@ -133,7 +134,7 @@ def attach_link_preview(message, enabled=True):
 
     if enabled is False or str(enabled).lower() in ("false", "0", "off"):
         return None
-    if message.is_system or str(message.content or "").startswith("__WHATSUP_"):
+    if message.is_system or str(message.content or "").startswith("__MHTALK_"):
         return None
     url = extract_first_url(message.content)
     if not url:
@@ -147,13 +148,13 @@ def attach_link_preview(message, enabled=True):
 
 def edit_window_open(message):
     """True while the sender may still edit ``message``."""
-    limit = timedelta(minutes=settings.WHATSUP_EDIT_WINDOW_MINUTES)
+    limit = timedelta(minutes=settings.MHTALK_EDIT_WINDOW_MINUTES)
     return timezone.now() - message.created_at <= limit
 
 
 def delete_for_everyone_window_open(message):
     """True while the sender may still delete ``message`` for everyone."""
-    limit = timedelta(hours=settings.WHATSUP_DELETE_FOR_EVERYONE_HOURS)
+    limit = timedelta(hours=settings.MHTALK_DELETE_FOR_EVERYONE_HOURS)
     return timezone.now() - message.created_at <= limit
 
 
@@ -419,6 +420,11 @@ class ChatRoomListAPIView(generics.ListAPIView):
                 _hidden_from_list=Exists(hidden_from_list),
                 _has_message_after_clear=Exists(has_newer_message),
                 _last_message_id=Subquery(last_visible),
+                _last_reaction_id=Subquery(
+                    Reaction.objects.filter(message__room_id=OuterRef("pk"), message__is_deleted=False)
+                    .order_by("-created_at", "-id")
+                    .values("id")[:1]
+                ),
                 _unread_count=Coalesce(Subquery(unread_subquery), 0),
                 _unread_mention=Exists(
                     unread_mentions_for_user(Message.objects.filter(room_id=OuterRef("pk")), user)
@@ -448,6 +454,7 @@ class ChatRoomListAPIView(generics.ListAPIView):
         context = self.get_serializer_context()
         context["last_messages"] = last_messages
         context["starred_ids"] = starred_ids
+        context["last_reactions"] = last_reaction_previews(request.user, rooms, context)
         serializer = self.get_serializer_class()(rooms, many=True, context=context)
         return Response(serializer.data)
 
@@ -1201,6 +1208,7 @@ class ReactMessageAPIView(APIView):
 
         reaction = serializer.save()
         broadcast_reaction(reaction.message, request.user, reaction.emoji)
+        broadcast_room_changed(reaction.message.room_id, "reaction")
 
         return Response(
             {
@@ -1811,7 +1819,7 @@ class UpdateMessageAPIView(generics.UpdateAPIView):
     def update(self, request, *args, **kwargs):
         message = self.get_object()
 
-        if message.message_type != MessageType.TEXT or str(message.content or "").startswith("__WHATSUP_"):
+        if message.message_type != MessageType.TEXT or str(message.content or "").startswith("__MHTALK_"):
             return Response(
                 {"detail": "Only text messages can be edited."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -1819,7 +1827,7 @@ class UpdateMessageAPIView(generics.UpdateAPIView):
 
         if not edit_window_open(message):
             return Response(
-                {"detail": f"Messages can only be edited within {settings.WHATSUP_EDIT_WINDOW_MINUTES} minutes of sending."},
+                {"detail": f"Messages can only be edited within {settings.MHTALK_EDIT_WINDOW_MINUTES} minutes of sending."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -1900,7 +1908,7 @@ class DeleteMessageAPIView(APIView):
                 )
             if not delete_for_everyone_window_open(message):
                 return Response(
-                    {"detail": f"Messages can only be deleted for everyone within {settings.WHATSUP_DELETE_FOR_EVERYONE_HOURS} hours of sending."},
+                    {"detail": f"Messages can only be deleted for everyone within {settings.MHTALK_DELETE_FOR_EVERYONE_HOURS} hours of sending."},
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
@@ -2064,7 +2072,7 @@ class DeleteMessagesForEveryoneAPIView(APIView):
                 }, status=403)
             if any(not delete_for_everyone_window_open(message) for message in messages):
                 return Response({
-                    "detail": f"Some selected messages are older than {settings.WHATSUP_DELETE_FOR_EVERYONE_HOURS} hours and can only be deleted for you. No messages were changed."
+                    "detail": f"Some selected messages are older than {settings.MHTALK_DELETE_FOR_EVERYONE_HOURS} hours and can only be deleted for you. No messages were changed."
                 }, status=403)
             soft_delete_messages_for_everyone(messages)
         return Response({"message": "Messages deleted for everyone.", "room_id": room.id, "message_ids": ids}, status=200)
@@ -2576,9 +2584,9 @@ class PinChatAPIView(APIView):
             pinned_count = Participant.objects.filter(
                 user=request.user, is_pinned=True, room__is_active=True,
             ).count()
-            if pinned_count >= settings.WHATSUP_MAX_PINNED_CHATS:
+            if pinned_count >= settings.MHTALK_MAX_PINNED_CHATS:
                 return Response(
-                    {"detail": f"You can only pin up to {settings.WHATSUP_MAX_PINNED_CHATS} chats."},
+                    {"detail": f"You can only pin up to {settings.MHTALK_MAX_PINNED_CHATS} chats."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
         participant.is_pinned = is_pinned
@@ -2690,7 +2698,7 @@ def shared_media_payload(base, kind):
     if kind == "links":
         messages = (
             base.filter(message_type=MessageType.TEXT, content__iregex=LINK_PATTERN)
-            .exclude(content__startswith="__WHATSUP_")
+            .exclude(content__startswith="__MHTALK_")
             .select_related("sender", "sender__profile")
             .order_by("-created_at")[:200]
         )
@@ -2788,7 +2796,7 @@ class RoomPinnedMessagesAPIView(APIView):
             with_message_relations(visible_messages_for_user(
                 Message.objects.filter(room_id=pk, is_pinned=True, is_deleted=False), request.user
             ))
-            .order_by("-pinned_at", "-id")[: settings.WHATSUP_MAX_PINNED_MESSAGES]
+            .order_by("-pinned_at", "-id")[: settings.MHTALK_MAX_PINNED_MESSAGES]
         )
         return Response(MessageSerializer(messages, many=True, context={"request": request}).data)
 
@@ -2811,7 +2819,7 @@ class GlobalMessageSearchAPIView(APIView):
                     is_deleted=False,
                     message_type=MessageType.TEXT,
                     content__icontains=query,
-                ).exclude(content__startswith="__WHATSUP_"),
+                ).exclude(content__startswith="__MHTALK_"),
                 request.user,
             )
             .select_related("sender", "sender__profile")

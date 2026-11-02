@@ -3,7 +3,7 @@
  * The server snapshots the audience on every status it stores, and enforces
  * it on read; this preference only decides what new statuses use.
  */
-const key = (userId) => `whatsup_status_privacy_${userId}`;
+const key = (userId) => `mhtalk_status_privacy_${userId}`;
 
 export function getStatusPrivacy(userId) {
   try {

@@ -22,10 +22,10 @@ const PUBLIC_SHELL = [
   "/apple-touch-icon.png",
 ];
 
-export default function whatsupServiceWorker() {
+export default function mhtalkServiceWorker() {
   let outDir = "dist";
   return {
-    name: "whatsup-service-worker",
+    name: "mhtalk-service-worker",
     apply: "build",
     configResolved(config) {
       outDir = resolve(config.root, config.build.outDir);
@@ -47,8 +47,8 @@ export default function whatsupServiceWorker() {
       }
       const version = hash.digest("hex").slice(0, 12);
       const source = template
-        .replace('"__WHATSUP_SW_VERSION__"', JSON.stringify(version))
-        .replace("[/* __WHATSUP_SW_PRECACHE__ */]", JSON.stringify(precache, null, 2));
+        .replace('"__MHTALK_SW_VERSION__"', JSON.stringify(version))
+        .replace("[/* __MHTALK_SW_PRECACHE__ */]", JSON.stringify(precache, null, 2));
       writeFileSync(resolve(outDir, "sw.js"), source);
     },
   };

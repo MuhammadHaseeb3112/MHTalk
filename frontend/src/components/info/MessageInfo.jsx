@@ -47,13 +47,13 @@ export default function MessageInfo({ roomId, messageId }) {
       window.clearTimeout(timer);
       timer = window.setTimeout(load, 250); // batch bursts of receipts
     };
-    window.addEventListener("whatsup:receipt", onReceipt);
+    window.addEventListener("mhtalk:receipt", onReceipt);
     // Safety net in case the socket was reconnecting when a receipt was sent.
     const poll = window.setInterval(() => {
       if (document.visibilityState === "visible") load();
     }, 15000);
     return () => {
-      window.removeEventListener("whatsup:receipt", onReceipt);
+      window.removeEventListener("mhtalk:receipt", onReceipt);
       window.clearTimeout(timer);
       window.clearInterval(poll);
     };

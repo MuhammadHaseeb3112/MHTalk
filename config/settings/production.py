@@ -64,4 +64,4 @@ enable_db_pool(DATABASES["default"])
 # once per deploy by the entrypoint, not by every worker on start-up.
 import os  # noqa: E402
 
-os.environ.setdefault("WHATSUP_RESET_PRESENCE_ON_STARTUP", "0")
+os.environ.setdefault("MHTALK_RESET_PRESENCE_ON_STARTUP", "0")

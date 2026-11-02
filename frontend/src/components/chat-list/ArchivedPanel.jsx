@@ -23,7 +23,7 @@ export default function ArchivedPanel() {
       <div className="panel__scroll">
         <p className="archived-note">These chats stay archived when new messages are received.</p>
         <div className="list-pad">
-          {rows.map(({ room, title, senderName, preview, typingText }) => (
+          {rows.map(({ room, title, senderName, preview, reacted, typingText }) => (
             <ChatListItem
               key={room.id}
               room={room}
@@ -31,6 +31,7 @@ export default function ArchivedPanel() {
               me={me}
               senderName={senderName}
               preview={preview}
+              reacted={reacted}
               typingText={typingText}
               active={room.id === activeRoomId}
               selectMode={false}

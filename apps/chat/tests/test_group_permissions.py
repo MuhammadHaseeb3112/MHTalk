@@ -39,7 +39,7 @@ def events(room):
     return [json.loads(row.content[len(GROUP_EVENT_PREFIX):]) for row in rows]
 
 
-@override_settings(MEDIA_ROOT="/tmp/whatsup-test-media")
+@override_settings(MEDIA_ROOT="/tmp/mhtalk-test-media")
 class GroupPermissionTests(TestCase):
     def setUp(self):
         self.alice = make_user("+923000001001", "Alice")
@@ -156,7 +156,7 @@ class GroupPermissionTests(TestCase):
         self.assertTrue(Participant.objects.filter(room=self.room, user=self.carol).exists())
 
 
-@override_settings(MEDIA_ROOT="/tmp/whatsup-test-media")
+@override_settings(MEDIA_ROOT="/tmp/mhtalk-test-media")
 class InviteLinkTests(TestCase):
     def setUp(self):
         cache.clear()

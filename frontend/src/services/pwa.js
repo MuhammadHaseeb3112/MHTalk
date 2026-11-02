@@ -2,7 +2,7 @@
  * Installable app (PWA) glue:
  *   - registers /sw.js in production builds only (never in `vite` dev),
  *   - shows "New version available — Reload" when a new deploy is waiting,
- *   - turns service-worker notification clicks into "whatsup:open-room",
+ *   - turns service-worker notification clicks into "mhtalk:open-room",
  *   - keeps the browser's install prompt for Settings → "Install app".
  */
 import { toast } from "./toast";
@@ -104,7 +104,7 @@ export function registerServiceWorker() {
   });
   navigator.serviceWorker.addEventListener("message", (event) => {
     if (event.data?.type === "open-room" && event.data.room_id) {
-      window.dispatchEvent(new CustomEvent("whatsup:open-room", { detail: Number(event.data.room_id) }));
+      window.dispatchEvent(new CustomEvent("mhtalk:open-room", { detail: Number(event.data.room_id) }));
     }
   });
   registrationPromise = new Promise((resolve) => {

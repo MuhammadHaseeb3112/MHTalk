@@ -2,6 +2,8 @@
 from pathlib import Path
 from datetime import timedelta
 from decouple import config
+
+
 from urllib.parse import parse_qs, unquote, urlparse
 import os
 
@@ -119,8 +121,8 @@ else:
             "DB_ENGINE",
             default="django.db.backends.postgresql",
         ),
-        "NAME": config("DB_NAME", default="whatsup_db"),
-        "USER": config("DB_USER", default="whatsup_user"),
+        "NAME": config("DB_NAME", default="mhtalk_db"),
+        "USER": config("DB_USER", default="mhtalk_user"),
         "PASSWORD": config("DB_PASSWORD", default=""),
         "HOST": config("DB_HOST", default="db"),
         "PORT": config("DB_PORT", default="5432"),
@@ -253,7 +255,7 @@ CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
         "LOCATION": REDIS_URL,
-        "KEY_PREFIX": "whatsup",
+        "KEY_PREFIX": "mhtalk",
         "TIMEOUT": 300,
     }
 }
@@ -273,15 +275,15 @@ CSRF_TRUSTED_ORIGINS = config(
 # Voice/video calls. Public STUN always; TURN relays calls for users behind
 # strict networks. Either a coturn shared secret (short-lived credentials are
 # generated per user) or a fixed username/password from a TURN provider.
-WHATSUP_TURN_URLS = config(
+MHTALK_TURN_URLS = config(
     "TURN_URLS",
     default="",
     cast=lambda v: [url.strip() for url in v.split(",") if url.strip()],
 )
-WHATSUP_TURN_SECRET = config("TURN_SECRET", default="")
-WHATSUP_TURN_USERNAME = config("TURN_USERNAME", default="")
-WHATSUP_TURN_PASSWORD = config("TURN_PASSWORD", default="")
-WHATSUP_TURN_TTL_SECONDS = config("TURN_TTL_SECONDS", default=86400, cast=int)
+MHTALK_TURN_SECRET = config("TURN_SECRET", default="")
+MHTALK_TURN_USERNAME = config("TURN_USERNAME", default="")
+MHTALK_TURN_PASSWORD = config("TURN_PASSWORD", default="")
+MHTALK_TURN_TTL_SECONDS = config("TURN_TTL_SECONDS", default=86400, cast=int)
 
 LOGGING = {
     "version": 1,
@@ -347,7 +349,7 @@ if config("USE_S3_MEDIA", default=False, cast=bool):
     }
 
 # Serve /media/ from Django even with DEBUG off (only when no proxy/bucket does it).
-WHATSUP_SERVE_MEDIA = config("WHATSUP_SERVE_MEDIA", default=False, cast=bool)
+MHTALK_SERVE_MEDIA = config("MHTALK_SERVE_MEDIA", default=False, cast=bool)
 
 # Uploads above this size are streamed to a temp file instead of RAM.
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
@@ -355,20 +357,20 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 
 # WhatsApp-style message rules (override in .env-driven settings if needed).
 # A sender may edit a text message for this many minutes after sending it.
-WHATSUP_EDIT_WINDOW_MINUTES = config("WHATSUP_EDIT_WINDOW_MINUTES", default=15, cast=int)
+MHTALK_EDIT_WINDOW_MINUTES = config("MHTALK_EDIT_WINDOW_MINUTES", default=15, cast=int)
 # "Delete for everyone" is allowed for this many hours after sending.
-WHATSUP_DELETE_FOR_EVERYONE_HOURS = config("WHATSUP_DELETE_FOR_EVERYONE_HOURS", default=48, cast=int)
+MHTALK_DELETE_FOR_EVERYONE_HOURS = config("MHTALK_DELETE_FOR_EVERYONE_HOURS", default=48, cast=int)
 # Maximum number of chats a user may pin.
-WHATSUP_MAX_PINNED_CHATS = 3
+MHTALK_MAX_PINNED_CHATS = 3
 # Pinned messages per chat (WhatsApp allows 3; pinning another replaces the oldest).
-WHATSUP_MAX_PINNED_MESSAGES = 3
+MHTALK_MAX_PINNED_MESSAGES = 3
 
 # MHTalk AI (assistant chat). Leave the key empty to turn it off.
 # Providers: gemini (free key, default), groq (free key), openai, anthropic.
-WHATSUP_AI_PROVIDER = config("WHATSUP_AI_PROVIDER", default="gemini")
-WHATSUP_AI_API_KEY = config("WHATSUP_AI_API_KEY", default="")
-WHATSUP_AI_MODEL = config("WHATSUP_AI_MODEL", default="")
-WHATSUP_AI_BASE_URL = config("WHATSUP_AI_BASE_URL", default="")
+MHTALK_AI_PROVIDER = config("MHTALK_AI_PROVIDER", default="gemini")
+MHTALK_AI_API_KEY = config("MHTALK_AI_API_KEY", default="")
+MHTALK_AI_MODEL = config("MHTALK_AI_MODEL", default="")
+MHTALK_AI_BASE_URL = config("MHTALK_AI_BASE_URL", default="")
 
 
 # Web Push (background notifications when no tab is open). Generate a key
@@ -377,4 +379,4 @@ VAPID_PUBLIC_KEY = config("VAPID_PUBLIC_KEY", default="")
 VAPID_PRIVATE_KEY = config("VAPID_PRIVATE_KEY", default="")
 VAPID_SUBJECT = config("VAPID_SUBJECT", default="mailto:admin@example.com")
 # Run push jobs synchronously (tests only).
-WHATSUP_PUSH_INLINE = False
+MHTALK_PUSH_INLINE = False

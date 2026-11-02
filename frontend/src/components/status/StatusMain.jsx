@@ -3,7 +3,7 @@ import { StatusIcon } from "../common/Icons";
 
 /** Right-hand pane of the Status section. */
 export default function StatusMain() {
-  const start = (mode) => window.dispatchEvent(new CustomEvent("whatsup:new-status", { detail: mode }));
+  const start = (mode) => window.dispatchEvent(new CustomEvent("mhtalk:new-status", { detail: mode }));
   return (
     <section className="intro intro--status">
       <div className="intro__card">

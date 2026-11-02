@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useStarredCount } from "../../hooks";
 import { Ban, Bell, BellOff, Eraser, Heart, HeartOff, Pencil, Phone, Star, Timer, Trash2, UserPlus, Video } from "lucide-react";
 import { contactsApi } from "../../api/endpoints";
 import { favoriteRoom, muteRoom } from "../../store/actions";
@@ -21,6 +22,7 @@ export default function ContactInfo({ roomId }) {
   const { startCall } = useCalls();
   const room = useStore((state) => state.rooms[roomId]);
   const me = useStore((state) => state.me);
+  const starredCount = useStarredCount(roomId);
   const contacts = useStore((state) => state.contacts);
   const presence = useStore((state) => (room?.otherUser ? state.presence[room.otherUser.id] : null));
   const blocked = useStore((state) => (room?.otherUser ? state.blocked.includes(Number(room.otherUser.id)) : false));
@@ -83,7 +85,7 @@ export default function ContactInfo({ roomId }) {
         <MediaSummary roomId={room.id} onOpen={() => app.openDrawer("media", { roomId: room.id })} />
 
         <div className="info-section info-section--list">
-          <InfoRow icon={Star} title="Starred messages" onClick={() => app.pushPanel("starred", { roomId: room.id })} />
+          <InfoRow icon={Star} title="Starred messages" onClick={() => app.pushPanel("starred", { roomId: room.id })} trailing={starredCount ? <span className="info-action__count">{starredCount}</span> : null} />
           <InfoRow
             icon={Timer}
             title="Disappearing messages"

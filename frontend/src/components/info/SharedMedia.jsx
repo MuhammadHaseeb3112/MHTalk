@@ -123,7 +123,7 @@ export default function SharedMedia({ roomId, tab: initialTab = "media" }) {
           startIndex={viewer}
           nameOf={nameOf}
           onClose={() => setViewer(null)}
-          onGoTo={(message) => window.dispatchEvent(new CustomEvent("whatsup:jump-to", { detail: message.id }))}
+          onGoTo={(message) => window.dispatchEvent(new CustomEvent("mhtalk:jump-to", { detail: message.id }))}
         />
       ) : null}
     </section>

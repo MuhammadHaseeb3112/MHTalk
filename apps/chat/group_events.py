@@ -3,7 +3,7 @@ Group system messages ("Alice changed this group's settings…", "Bob joined
 using this group's invite link", "Carol left").
 
 They follow the same convention as call cards (apps/calls/events.py): a TEXT
-message whose content is a ``__WHATSUP_…__:`` prefix plus a JSON payload, so
+message whose content is a ``__MHTALK_…__:`` prefix plus a JSON payload, so
 they flow through the normal message list, chat list preview and sockets.
 The client renders them as centred pills. The payload's ``text`` contains an
 ``{actor}`` placeholder the client replaces with "You" or the actor's name.
@@ -17,7 +17,7 @@ import json
 from .choices import MessageType
 from .models import Message
 
-GROUP_EVENT_PREFIX = "__WHATSUP_GROUP_EVENT__:"
+GROUP_EVENT_PREFIX = "__MHTALK_GROUP_EVENT__:"
 
 PERMISSION_TEXT = {
     "send_messages_admins_only": (

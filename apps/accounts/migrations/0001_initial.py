@@ -42,7 +42,7 @@ class Migration(migrations.Migration):
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('display_name', models.CharField(db_index=True, max_length=100)),
                 ('profile_picture', models.ImageField(blank=True, null=True, upload_to='profiles/')),
-                ('about', models.CharField(blank=True, default="Hey there! I'm using WhatsUp.", max_length=150)),
+                ('about', models.CharField(blank=True, default="Hey there! I'm using MHTalk.", max_length=150)),
                 ('last_seen', models.DateTimeField(default=django.utils.timezone.now)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),

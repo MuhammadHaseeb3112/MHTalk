@@ -9,7 +9,7 @@ const pending = new Map(); // roomId -> messageId
 export function jumpToMessage(roomId, messageId) {
   if (!roomId || !messageId) return;
   pending.set(Number(roomId), Number(messageId));
-  window.dispatchEvent(new CustomEvent("whatsup:jump-pending", { detail: { roomId: Number(roomId) } }));
+  window.dispatchEvent(new CustomEvent("mhtalk:jump-pending", { detail: { roomId: Number(roomId) } }));
 }
 
 export function takePendingJump(roomId) {

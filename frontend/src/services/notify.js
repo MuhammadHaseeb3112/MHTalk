@@ -3,7 +3,7 @@
  * notifications and the tab title badge. Preferences are per-browser.
  */
 
-const PREFS_KEY = "whatsup_notification_prefs";
+const PREFS_KEY = "mhtalk_notification_prefs";
 
 export function getNotificationPrefs() {
   try {

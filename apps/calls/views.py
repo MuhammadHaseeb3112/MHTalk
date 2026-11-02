@@ -768,16 +768,16 @@ class IceServersAPIView(APIView):
         from django.conf import settings
 
         servers = [{"urls": ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"]}]
-        urls = list(getattr(settings, "WHATSUP_TURN_URLS", []) or [])
-        ttl = int(getattr(settings, "WHATSUP_TURN_TTL_SECONDS", 86400))
-        if urls and settings.WHATSUP_TURN_SECRET:
+        urls = list(getattr(settings, "MHTALK_TURN_URLS", []) or [])
+        ttl = int(getattr(settings, "MHTALK_TURN_TTL_SECONDS", 86400))
+        if urls and settings.MHTALK_TURN_SECRET:
             username = f"{int(time.time()) + ttl}:{request.user.id}"
-            digest = hmac.new(settings.WHATSUP_TURN_SECRET.encode(), username.encode(), hashlib.sha1).digest()
+            digest = hmac.new(settings.MHTALK_TURN_SECRET.encode(), username.encode(), hashlib.sha1).digest()
             servers.append({"urls": urls, "username": username, "credential": base64.b64encode(digest).decode()})
-        elif urls and settings.WHATSUP_TURN_USERNAME:
+        elif urls and settings.MHTALK_TURN_USERNAME:
             servers.append({
                 "urls": urls,
-                "username": settings.WHATSUP_TURN_USERNAME,
-                "credential": settings.WHATSUP_TURN_PASSWORD,
+                "username": settings.MHTALK_TURN_USERNAME,
+                "credential": settings.MHTALK_TURN_PASSWORD,
             })
         return Response({"ice_servers": servers, "ttl": ttl})

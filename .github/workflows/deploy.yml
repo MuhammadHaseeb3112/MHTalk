@@ -36,7 +36,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           command_timeout: 25m
-          script: cd ~/whatsup && bash deploy/deploy.sh
+          script: cd ~/mhtalk && bash deploy/deploy.sh
 
       - name: Check the live site
         if: vars.DEPLOY_URL != ''

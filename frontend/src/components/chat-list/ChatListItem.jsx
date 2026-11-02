@@ -26,9 +26,10 @@ export function Ticks({ message, size = 16 }) {
   return <SingleTick size={size} className="ticks" />;
 }
 
-function Preview({ room, me, senderName, typingText, preview }) {
+function Preview({ room, me, senderName, typingText, preview, reacted }) {
   const message = room.lastMessage;
   if (typingText) return <span className="chat-item__typing">{typingText}</span>;
+  if (reacted) return <span className="chat-item__text">{preview}</span>;
   if (!message) return <span className="chat-item__placeholder">{room.isGroup ? "Group created" : "Tap to start chatting"}</span>;
 
   const isOwn = Number(message.sender?.id) === Number(me?.id);
@@ -78,6 +79,7 @@ function ChatListItem({
   me,
   senderName,
   preview,
+  reacted,
   typingText,
   active,
   selectMode,
@@ -141,7 +143,7 @@ function ChatListItem({
                 <span>Ongoing {activeCallType === "VIDEO" ? "video" : "voice"} call</span>
               </span>
             ) : (
-              <Preview room={room} me={me} senderName={senderName} typingText={typingText} preview={preview} />
+              <Preview room={room} me={me} senderName={senderName} typingText={typingText} preview={preview} reacted={reacted} />
             )}
           </span>
           <span className="chat-item__meta">

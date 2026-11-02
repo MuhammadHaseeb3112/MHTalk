@@ -41,7 +41,7 @@ from apps.chat.models import (
 )
 from config.media_views import is_private_media_path, serve_media
 
-TEST_MEDIA = tempfile.mkdtemp(prefix="whatsup-feature-media-")
+TEST_MEDIA = tempfile.mkdtemp(prefix="mhtalk-feature-media-")
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
 
 
@@ -654,7 +654,7 @@ class LinkPreviewGuardTests(TestCase):
         self.assertIsNone(link_preview.parse_preview("<p>nothing</p>", "http://x.io/"))
 
 
-@override_settings(WHATSUP_LINK_PREVIEW_ALLOW_LOOPBACK=True)
+@override_settings(MHTALK_LINK_PREVIEW_ALLOW_LOOPBACK=True)
 class LinkPreviewFetchTests(TestCase):
     """Fetches from a local http.server (loopback is allowed only here)."""
 
@@ -715,7 +715,7 @@ class LinkPreviewFetchTests(TestCase):
                 link_preview.fetch_html(self.base + "/page")
 
     def test_loopback_is_refused_without_the_test_setting(self):
-        with override_settings(WHATSUP_LINK_PREVIEW_ALLOW_LOOPBACK=False):
+        with override_settings(MHTALK_LINK_PREVIEW_ALLOW_LOOPBACK=False):
             self.assertIsNone(link_preview.get_link_preview(self.base + "/page"))
 
     def test_results_are_cached(self):

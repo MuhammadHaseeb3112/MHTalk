@@ -31,10 +31,10 @@ def _reset_stale_presence():
     Connection counters live in the database. After a restart no socket is
     connected yet, so clear them; otherwise users who were online when the
     server stopped would appear online forever. Disable with
-    WHATSUP_RESET_PRESENCE_ON_STARTUP=0 when running several ASGI workers
+    MHTALK_RESET_PRESENCE_ON_STARTUP=0 when running several ASGI workers
     (then run ``manage.py reset_presence`` once per deploy instead).
     """
-    if os.environ.get("WHATSUP_RESET_PRESENCE_ON_STARTUP", "1") != "1":
+    if os.environ.get("MHTALK_RESET_PRESENCE_ON_STARTUP", "1") != "1":
         return
     try:
         from django.core.management import call_command
@@ -62,4 +62,4 @@ application = ProtocolTypeRouter(
             )
         ),
     }
-)
+)

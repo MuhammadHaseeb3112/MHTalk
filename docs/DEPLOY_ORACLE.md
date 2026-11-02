@@ -117,7 +117,7 @@ nano .env.prod
 
 Fill in your domain everywhere (`DOMAIN`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`,
 `CORS_ALLOWED_ORIGINS`, `TURN_URLS`) and the generated secrets. Optional:
-`WHATSUP_AI_API_KEY` (free Gemini key) and the push-notification keys
+`MHTALK_AI_API_KEY` (free Gemini key) and the push-notification keys
 (Step 8). Save with **Ctrl+O**, **Enter**, **Ctrl+X**.
 
 ## Step 8. Start everything

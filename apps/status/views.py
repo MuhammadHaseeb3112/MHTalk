@@ -443,7 +443,7 @@ class StatusReactionAPIView(APIView):
                 "owner_id": status_obj.user_id,
                 "status_created_at": status_obj.created_at.isoformat(),
             }
-            content = "__WHATSUP_STATUS_REACTION__:" + json.dumps(preview, separators=(",", ":"))
+            content = "__MHTALK_STATUS_REACTION__:" + json.dumps(preview, separators=(",", ":"))
             client_message_id = f"status-reaction-{status_obj.id}-{request.user.id}"
             message, _created = Message.objects.update_or_create(
                 room=room,

@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='profile',
             name='about',
-            field=models.CharField(blank=True, default="Hey there! I'm using WhatsUp.", help_text='User status or bio.', max_length=150),
+            field=models.CharField(blank=True, default="Hey there! I'm using MHTalk.", help_text='User status or bio.', max_length=150),
         ),
         migrations.AlterField(
             model_name='profile',

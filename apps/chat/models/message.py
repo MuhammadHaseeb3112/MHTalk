@@ -193,7 +193,7 @@ class Message(models.Model):
     @property
     def is_system(self) -> bool:
         """Chat notices (timer changes, group events) – never expire or forward."""
-        return str(self.content or "").startswith((SYSTEM_PREFIX, "__WHATSUP_GROUP_EVENT__:"))
+        return str(self.content or "").startswith((SYSTEM_PREFIX, "__MHTALK_GROUP_EVENT__:"))
 
     def save(self, *args, **kwargs):
         # Every creation path (REST, WebSocket, forwards, call cards...) goes

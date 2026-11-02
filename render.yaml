@@ -27,7 +27,7 @@ services:
         sync: false
       - key: WEB_CONCURRENCY
         value: "1"
-      - key: WHATSUP_AI_API_KEY
+      - key: MHTALK_AI_API_KEY
         sync: false
       - key: VAPID_PUBLIC_KEY
         sync: false

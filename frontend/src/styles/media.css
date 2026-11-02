@@ -512,6 +512,9 @@
   min-height: 0;
   display: grid;
   place-items: center;
+  /* Rows/columns may shrink below the image size so tall photos fit. */
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  overflow: hidden;
   padding: 10px 70px;
 }
 .lightbox__stage img,

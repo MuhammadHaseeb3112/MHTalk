@@ -7,16 +7,16 @@ forwards it to the AI provider, so the key never reaches the browser.
 Configure it in ``.env`` (free options first):
 
     # Google Gemini - free key from https://aistudio.google.com/apikey
-    WHATSUP_AI_PROVIDER=gemini
-    WHATSUP_AI_API_KEY=AIza...
+    MHTALK_AI_PROVIDER=gemini
+    MHTALK_AI_API_KEY=AIza...
 
     # Groq - free key from https://console.groq.com/keys
-    WHATSUP_AI_PROVIDER=groq
-    WHATSUP_AI_API_KEY=gsk_...
+    MHTALK_AI_PROVIDER=groq
+    MHTALK_AI_API_KEY=gsk_...
 
     # Also supported: openai (or any OpenAI-compatible service via
-    # WHATSUP_AI_BASE_URL) and anthropic.
-    WHATSUP_AI_MODEL=...   # optional, a sensible default per provider
+    # MHTALK_AI_BASE_URL) and anthropic.
+    MHTALK_AI_MODEL=...   # optional, a sensible default per provider
 
 Only the Python standard library is used, so no new package is needed.
 """
@@ -70,11 +70,11 @@ SYSTEM_PROMPT = (
 
 
 def ai_settings():
-    provider = (getattr(settings, "WHATSUP_AI_PROVIDER", "") or "gemini").strip().lower()
+    provider = (getattr(settings, "MHTALK_AI_PROVIDER", "") or "gemini").strip().lower()
     if provider not in PROVIDERS:
         provider = "gemini"
     preset = PROVIDERS[provider]
-    base_url = (getattr(settings, "WHATSUP_AI_BASE_URL", "") or "").strip().rstrip("/")
+    base_url = (getattr(settings, "MHTALK_AI_BASE_URL", "") or "").strip().rstrip("/")
     url = preset["url"]
     if base_url and provider != "anthropic":
         url = base_url if base_url.endswith("/chat/completions") else f"{base_url}/chat/completions"
@@ -82,8 +82,8 @@ def ai_settings():
         "provider": provider,
         "label": preset["label"],
         "url": url,
-        "key": (getattr(settings, "WHATSUP_AI_API_KEY", "") or "").strip(),
-        "model": (getattr(settings, "WHATSUP_AI_MODEL", "") or "").strip() or preset["model"],
+        "key": (getattr(settings, "MHTALK_AI_API_KEY", "") or "").strip(),
+        "model": (getattr(settings, "MHTALK_AI_MODEL", "") or "").strip() or preset["model"],
     }
 
 
@@ -176,14 +176,14 @@ class AssistantAPIView(APIView):
         config = ai_settings()
         if not config["key"]:
             return Response(
-                {"detail": "MHTalk AI isn't set up yet. Add a free Gemini key as WHATSUP_AI_API_KEY in the backend .env file and restart."},
+                {"detail": "MHTalk AI isn't set up yet. Add a free Gemini key as MHTALK_AI_API_KEY in the backend .env file and restart."},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
         messages = clean_messages(request.data.get("messages"))
         if messages is None:
             return Response({"detail": "Send at least one message."}, status=status.HTTP_400_BAD_REQUEST)
 
-        key = f"whatsup-ai-rate:{request.user.pk}"
+        key = f"mhtalk-ai-rate:{request.user.pk}"
         count = cache.get(key, 0)
         if count >= PER_MINUTE:
             return Response({"detail": "You're sending messages too fast. Try again in a minute."}, status=429)
@@ -201,13 +201,13 @@ class AssistantAPIView(APIView):
                 pass
             logger.warning("MHTalk AI request failed: %s %s", error.code, detail)
             if error.code in (401, 403) or (error.code == 400 and "key" in detail.lower()):
-                message = "The AI key was rejected. Check WHATSUP_AI_API_KEY and WHATSUP_AI_PROVIDER."
+                message = "The AI key was rejected. Check MHTALK_AI_API_KEY and MHTALK_AI_PROVIDER."
             elif error.code == 429:
                 message = "The free AI limit was reached for now. Please wait a minute and try again."
             elif error.code == 404:
                 message = (
                     f"The AI model \"{config['model']}\" isn't available for this key. "
-                    "Set WHATSUP_AI_MODEL in .env to a current model and restart. "
+                    "Set MHTALK_AI_MODEL in .env to a current model and restart. "
                     f"{detail}"
                 ).strip()
             else:

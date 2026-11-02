@@ -77,14 +77,15 @@ function ViewersSheet({ statusId, count, onClose }) {
  * Full-screen status viewer with progress bars, auto-advance, pause on hold,
  * reactions/replies for others' statuses and viewers/delete for your own.
  */
-export default function StatusViewer({ groups, startGroup = 0, onClose }) {
+export default function StatusViewer({ groups, startGroup = 0, startStatusId, onClose }) {
   const me = useStore((state) => state.me);
   const contacts = useStore((state) => state.contacts);
   const contactMap = useMemo(() => contactsByUser(contacts), [contacts]);
   const [groupIndex, setGroupIndex] = useState(startGroup);
   const group = groups[groupIndex];
   const firstUnseen = Math.max(0, group?.statuses.findIndex((status) => !status.is_viewed));
-  const [index, setIndex] = useState(firstUnseen);
+  const requested = startStatusId ? group?.statuses.findIndex((status) => Number(status.id) === Number(startStatusId)) : -1;
+  const [index, setIndex] = useState(requested >= 0 ? requested : firstUnseen);
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
   const [muted, setMuted] = useState(false);

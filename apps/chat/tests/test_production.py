@@ -29,13 +29,13 @@ class IceServerTests(TestCase):
     def test_requires_login(self):
         self.assertEqual(APIClient().get("/api/calls/ice-servers/").status_code, 401)
 
-    @override_settings(WHATSUP_TURN_URLS=[], WHATSUP_TURN_SECRET="", WHATSUP_TURN_USERNAME="")
+    @override_settings(MHTALK_TURN_URLS=[], MHTALK_TURN_SECRET="", MHTALK_TURN_USERNAME="")
     def test_stun_only_by_default(self):
         servers = self.client.get("/api/calls/ice-servers/").json()["ice_servers"]
         self.assertEqual(len(servers), 1)
         self.assertTrue(servers[0]["urls"][0].startswith("stun:"))
 
-    @override_settings(WHATSUP_TURN_URLS=["turn:turn.example.com:3478"], WHATSUP_TURN_SECRET="s3cret")
+    @override_settings(MHTALK_TURN_URLS=["turn:turn.example.com:3478"], MHTALK_TURN_SECRET="s3cret")
     def test_short_lived_coturn_credentials(self):
         turn = self.client.get("/api/calls/ice-servers/").json()["ice_servers"][1]
         self.assertTrue(turn["username"].endswith(f":{self.user.id}"))
@@ -45,8 +45,8 @@ class IceServerTests(TestCase):
         self.assertEqual(turn["credential"], expected)
 
     @override_settings(
-        WHATSUP_TURN_URLS=["turn:relay.example.com:80"], WHATSUP_TURN_SECRET="",
-        WHATSUP_TURN_USERNAME="u", WHATSUP_TURN_PASSWORD="p",
+        MHTALK_TURN_URLS=["turn:relay.example.com:80"], MHTALK_TURN_SECRET="",
+        MHTALK_TURN_USERNAME="u", MHTALK_TURN_PASSWORD="p",
     )
     def test_static_provider_credentials(self):
         turn = self.client.get("/api/calls/ice-servers/").json()["ice_servers"][1]
@@ -55,12 +55,12 @@ class IceServerTests(TestCase):
 
 class DatabaseUrlTests(TestCase):
     def test_parses_hosted_postgres_url(self):
-        db = _database_from_url("postgresql://neon%40user:p%23ss@ep-x.neon.tech:6543/whatsup?sslmode=require")
+        db = _database_from_url("postgresql://neon%40user:p%23ss@ep-x.neon.tech:6543/mhtalk?sslmode=require")
         self.assertEqual(db["USER"], "neon@user")
         self.assertEqual(db["PASSWORD"], "p#ss")
         self.assertEqual(db["HOST"], "ep-x.neon.tech")
         self.assertEqual(db["PORT"], "6543")
-        self.assertEqual(db["NAME"], "whatsup")
+        self.assertEqual(db["NAME"], "mhtalk")
         self.assertEqual(db["OPTIONS"], {"sslmode": "require"})
 
 

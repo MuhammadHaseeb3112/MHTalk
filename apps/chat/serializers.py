@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.db import transaction
 import json
-from django.db.models import Exists, OuterRef, Prefetch, Q
+from django.db.models import Exists, Max, OuterRef, Prefetch, Q, Subquery
 from rest_framework import serializers
 from django.utils import timezone
 from apps.accounts.serializers import UserSerializer
@@ -177,8 +177,10 @@ class ReactMessageSerializer(serializers.Serializer):
             user=request.user,
             defaults={
                 "emoji": validated_data["emoji"],
+                "created_at": timezone.now(),
             },
         )
+        ChatRoom.objects.filter(pk=validated_data["message"].room_id).update(updated_at=timezone.now())
 
         return reaction
     
@@ -289,7 +291,7 @@ class PinMessageSerializer(serializers.Serializer):
 
         if self.validated_data["is_pinned"] and not message.is_pinned:
             # WhatsApp keeps up to 3 pins per chat: pinning a 4th replaces the oldest.
-            limit = getattr(settings, "WHATSUP_MAX_PINNED_MESSAGES", 3)
+            limit = getattr(settings, "MHTALK_MAX_PINNED_MESSAGES", 3)
             pinned = list(
                 Message.objects.filter(room_id=message.room_id, is_pinned=True)
                 .exclude(pk=message.pk)
@@ -1256,6 +1258,7 @@ class ChatRoomSerializer(serializers.ModelSerializer):
     participants_count = serializers.SerializerMethodField()
     created_by_id = serializers.IntegerField(read_only=True)
     last_message = serializers.SerializerMethodField()
+    last_reaction = serializers.SerializerMethodField()
     unread_count = serializers.SerializerMethodField()
     is_pinned = serializers.SerializerMethodField()
     pinned_at = serializers.SerializerMethodField()
@@ -1281,6 +1284,7 @@ class ChatRoomSerializer(serializers.ModelSerializer):
             "participants_count",
             "participants",
             "last_message",
+            "last_reaction",
             "unread_count",
             "is_pinned",
             "pinned_at",
@@ -1405,6 +1409,16 @@ class ChatRoomSerializer(serializers.ModelSerializer):
             message,
             context=self.context,
         ).data
+
+    def get_last_reaction(self, obj):
+        """
+        The newest reaction in the chat when it is newer than the last message
+        (the chat list then shows "Reacted 😂 to: …" like WhatsApp).
+        """
+        previews = self.context.get("last_reactions")
+        if previews is None:
+            previews = last_reaction_previews(self._request_user(), [obj], self.context)
+        return previews.get(obj.pk)
 
     def get_unread_mention(self, obj):
         """True while an unread message in this chat @mentions the user."""
@@ -1638,3 +1652,66 @@ class CreateGroupSerializer(serializers.Serializer):
 class CreatePrivateChatSerializer(serializers.Serializer):
 
     user_id = serializers.IntegerField()
+
+def last_reaction_previews(user, rooms, context):
+    """
+    ``{room_id: {"emoji", "user_id", "created_at", "message"}}`` for rooms whose
+    newest reaction is newer than their last visible message. A fixed number
+    of queries whatever the number of rooms (used by the chat list).
+    """
+    if user is None or not rooms:
+        return {}
+    room_ids = [room.pk for room in rooms]
+    latest_ids = {}
+    for room in rooms:
+        reaction_id = getattr(room, "_last_reaction_id", None)
+        if reaction_id:
+            latest_ids[room.pk] = reaction_id
+    if not latest_ids and not any(hasattr(room, "_last_reaction_id") for room in rooms):
+        latest = (
+            Reaction.objects.filter(message__room_id=OuterRef("pk"), message__is_deleted=False)
+            .order_by("-created_at", "-id")
+            .values("id")[:1]
+        )
+        latest_ids = {
+            row["pk"]: row["rid"]
+            for row in ChatRoom.objects.filter(pk__in=room_ids).annotate(rid=Subquery(latest)).values("pk", "rid")
+            if row["rid"]
+        }
+    if not latest_ids:
+        return {}
+    reactions = {
+        reaction.id: reaction
+        for reaction in Reaction.objects.filter(id__in=latest_ids.values()).select_related("message")
+    }
+    message_ids = [reaction.message_id for reaction in reactions.values()]
+    hidden = set(DeletedMessage.objects.filter(user=user, message_id__in=message_ids).values_list("message_id", flat=True))
+    cleared = dict(ChatClear.objects.filter(user=user, room_id__in=room_ids).values_list("room_id", "cleared_at"))
+    last_times = dict(
+        visible_messages_for_user(Message.objects.filter(room_id__in=room_ids), user)
+        .values("room_id")
+        .annotate(latest=Max("created_at"))
+        .values_list("room_id", "latest")
+    )
+    messages = {message.id: message for message in with_message_relations(Message.objects.filter(id__in=message_ids))}
+    previews = {}
+    for room_id, reaction_id in latest_ids.items():
+        reaction = reactions.get(reaction_id)
+        if reaction is None or reaction.message_id in hidden:
+            continue
+        message = messages.get(reaction.message_id)
+        if message is None:
+            continue
+        clear_time = cleared.get(room_id)
+        if clear_time and message.created_at <= clear_time:
+            continue
+        last_time = last_times.get(room_id)
+        if last_time and reaction.created_at <= last_time:
+            continue
+        previews[room_id] = {
+            "emoji": reaction.emoji,
+            "user_id": reaction.user_id,
+            "created_at": reaction.created_at,
+            "message": MessageSerializer(message, context=context).data,
+        }
+    return previews

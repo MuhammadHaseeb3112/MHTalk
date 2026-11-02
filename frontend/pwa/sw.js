@@ -12,9 +12,9 @@
  * - Web Push: shows message / call notifications and deep-links on click.
  */
 
-const VERSION = "__WHATSUP_SW_VERSION__";
-const PRECACHE = [/* __WHATSUP_SW_PRECACHE__ */];
-const CACHE_PREFIX = "whatsup-shell-";
+const VERSION = "__MHTALK_SW_VERSION__";
+const PRECACHE = [/* __MHTALK_SW_PRECACHE__ */];
+const CACHE_PREFIX = "mhtalk-shell-";
 const CACHE = CACHE_PREFIX + VERSION;
 const SHELL_URL = "/index.html";
 const OFFLINE_URL = "/offline.html";
@@ -108,7 +108,7 @@ async function showPush(data) {
     body: data.body || "New message",
     icon: data.icon || "/pwa-192.png",
     badge: data.badge || "/pwa-badge-96.png",
-    tag: data.tag || (data.room_id ? `room-${data.room_id}` : "whatsup"),
+    tag: data.tag || (data.room_id ? `room-${data.room_id}` : "mhtalk"),
     renotify: true,
     requireInteraction: Boolean(data.require_interaction),
     vibrate: isCall ? [400, 200, 400, 200, 400] : [120, 60, 120],

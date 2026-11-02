@@ -114,15 +114,15 @@ export default function MainLayout({ onLogout }) {
   // Desktop notifications deep-link into a chat.
   useEffect(() => {
     const handler = (event) => openRoom(Number(event.detail));
-    window.addEventListener("whatsup:open-room", handler);
-    return () => window.removeEventListener("whatsup:open-room", handler);
+    window.addEventListener("mhtalk:open-room", handler);
+    return () => window.removeEventListener("mhtalk:open-room", handler);
   }, [openRoom]);
 
   // Opened from a push notification (/?room=12): jump straight into that chat.
   useEffect(() => {
     const roomId = consumeLaunchRoom();
     // Deferred so the listener above is attached (and survives StrictMode re-runs).
-    if (roomId) window.setTimeout(() => window.dispatchEvent(new CustomEvent("whatsup:open-room", { detail: roomId })), 0);
+    if (roomId) window.setTimeout(() => window.dispatchEvent(new CustomEvent("mhtalk:open-room", { detail: roomId })), 0);
   }, []);
 
   // Mark the open chat read again when the tab becomes visible.

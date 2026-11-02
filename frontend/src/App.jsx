@@ -14,7 +14,7 @@ import { forgetBackgroundPushOnLogout, syncBackgroundPush } from "./services/pus
 import { bootstrap } from "./store/actions";
 import { dispatch, useStore } from "./store/store";
 
-const AFTER_LOGIN_KEY = "whatsup:after-login";
+const AFTER_LOGIN_KEY = "mhtalk:after-login";
 const JOIN_PATTERN = /^\/join\/([A-Za-z0-9_-]{1,64})$/;
 
 /** Where to go after signing in (e.g. back to a /join/<code> link). */
@@ -80,15 +80,15 @@ export default function App() {
 
   // Account deleted (this tab or another one): back to the login page.
   useEffect(() => {
-    window.addEventListener("whatsup:signed-out", signOutLocally);
-    return () => window.removeEventListener("whatsup:signed-out", signOutLocally);
+    window.addEventListener("mhtalk:signed-out", signOutLocally);
+    return () => window.removeEventListener("mhtalk:signed-out", signOutLocally);
   }, [signOutLocally]);
 
   // Keep "me" fresh when the profile changes in another tab/device.
   useEffect(() => {
     const reload = () => authApi.me().then((user) => dispatch({ type: "me", me: user })).catch(() => {});
-    window.addEventListener("whatsup:me-changed", reload);
-    return () => window.removeEventListener("whatsup:me-changed", reload);
+    window.addEventListener("mhtalk:me-changed", reload);
+    return () => window.removeEventListener("mhtalk:me-changed", reload);
   }, []);
 
   // Route guards.

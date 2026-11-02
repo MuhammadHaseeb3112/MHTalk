@@ -1,85 +1,30 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Image as ImageIcon, Lock, MoreVertical, Pencil, Plus } from "lucide-react";
-import { statusApi } from "../../api/endpoints";
 import { useStore } from "../../store/store";
 import { toast } from "../../services/toast";
 import { detailTime } from "../../utils/format";
 import { contactsByUser, displayUserName } from "../../utils/messages";
-import { Avatar, Checkbox, EmptyState, IconButton, Menu, MenuButton, PanelHeader, SearchInput, Spinner } from "../common/ui";
+import { Avatar, EmptyState, IconButton, Menu, MenuButton, PanelHeader, Spinner } from "../common/ui";
 import { normalizeFiles, validateFiles } from "../../utils/files";
 import { useMediaQuery } from "../../hooks";
 import StatusComposer from "./StatusComposer";
 import StatusViewer from "./StatusViewer";
 import { getStatusPrivacy, setStatusPrivacy } from "./statusPrefs";
-
-const OPTIONS = [
-  { value: "CONTACTS", label: "My contacts", hint: "Share with all of your contacts" },
-  { value: "CONTACTS_EXCEPT", label: "My contacts except…", hint: "Share with your contacts except people you select" },
-  { value: "ONLY_SHARE_WITH", label: "Only share with…", hint: "Only share with selected contacts" },
-  { value: "EVERYONE", label: "Everyone", hint: "Anyone who has a chat with you on MHTalk" },
-];
+import StatusPrivacyEditor from "./StatusPrivacyEditor";
 
 function PrivacyView({ onBack }) {
   const me = useStore((state) => state.me);
   const [value, setValue] = useState(() => getStatusPrivacy(me.id));
-  const [people, setPeople] = useState(null);
-  const [query, setQuery] = useState("");
-  const contacts = useStore((state) => state.contacts);
-  const contactMap = useMemo(() => contactsByUser(contacts), [contacts]);
-
-  useEffect(() => {
-    statusApi.contacts().then((rows) => setPeople(rows.map((row) => row.user))).catch(() => setPeople([]));
-  }, []);
-
   const update = (next) => {
     setValue(next);
     setStatusPrivacy(me.id, next);
   };
-  const needsPicker = value.visibility === "CONTACTS_EXCEPT" || value.visibility === "ONLY_SHARE_WITH";
-  const filtered = (people || []).filter((user) => !query || displayUserName(user, contactMap).toLowerCase().includes(query.toLowerCase()));
 
   return (
     <section className="panel">
       <PanelHeader title="Status privacy" onBack={onBack} variant="sub" />
       <div className="panel__scroll">
-        <p className="section-label section-label--muted">Who can see my status updates</p>
-        <div className="radio-list radio-list--panel">
-          {OPTIONS.map((option) => (
-            <label key={option.value} className={`radio ${value.visibility === option.value ? "is-checked" : ""}`}>
-              <input type="radio" name="status-privacy" checked={value.visibility === option.value} onChange={() => update({ visibility: option.value, users: option.value === value.visibility ? value.users : [] })} />
-              <span className="radio__dot" />
-              <span className="radio__text">
-                <span>{option.label}</span>
-                <small>
-                  {option.value === value.visibility && needsPicker
-                    ? `${value.users.length} contact${value.users.length === 1 ? "" : "s"} ${option.value === "CONTACTS_EXCEPT" ? "excluded" : "included"}`
-                    : option.hint}
-                </small>
-              </span>
-            </label>
-          ))}
-        </div>
-        {needsPicker ? (
-          <>
-            <div className="section-label">{value.visibility === "CONTACTS_EXCEPT" ? "Hide status from" : "Share status with"}</div>
-            <SearchInput value={query} onChange={setQuery} placeholder="Search contacts" />
-            {!people ? <div className="list-loading"><Spinner /></div> : null}
-            <div className="list-pad">
-              {filtered.map((user) => {
-                const checked = value.users.includes(Number(user.id));
-                const toggle = () => update({ ...value, users: checked ? value.users.filter((id) => id !== Number(user.id)) : [...value.users, Number(user.id)] });
-                return (
-                  <button key={user.id} type="button" className="row" onClick={toggle}>
-                    <Avatar src={user.profile?.profile_picture} name={displayUserName(user, contactMap)} size={40} />
-                    <span className="row__body"><span className="row__title">{displayUserName(user, contactMap)}</span></span>
-                    <Checkbox checked={checked} label={`Select ${displayUserName(user, contactMap)}`} decorative />
-                  </button>
-                );
-              })}
-              {people && !people.length ? <EmptyState text="Save contacts or start chats to choose who sees your status." /> : null}
-            </div>
-          </>
-        ) : null}
+        <StatusPrivacyEditor value={value} onChange={update} />
         <p className="info-muted info-pad">
           <Lock size={12} /> Changes to your privacy settings won't affect status updates that you've sent already.
         </p>
@@ -107,8 +52,8 @@ export default function StatusPanel() {
       if (event.detail === "text") setComposer({ mode: "text" });
       else fileRef.current?.click();
     };
-    window.addEventListener("whatsup:new-status", handler);
-    return () => window.removeEventListener("whatsup:new-status", handler);
+    window.addEventListener("mhtalk:new-status", handler);
+    return () => window.removeEventListener("mhtalk:new-status", handler);
   }, []);
 
   const recent = feed.filter((group) => group.unseen_count > 0);

@@ -7,7 +7,7 @@
  * "System default" is chosen, and updates the browser/PWA theme-color.
  */
 
-export const THEME_KEY = "whatsup_theme";
+export const THEME_KEY = "mhtalk_theme";
 export const THEME_OPTIONS = [
   { value: "system", label: "System default" },
   { value: "light", label: "Light" },

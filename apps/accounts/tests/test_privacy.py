@@ -35,7 +35,7 @@ def set_privacy(user, **fields):
     Profile.objects.filter(user=user).update(**fields)
 
 
-@override_settings(MEDIA_ROOT="/tmp/whatsup-test-media")
+@override_settings(MEDIA_ROOT="/tmp/mhtalk-test-media")
 class PrivacySettingsTests(TestCase):
     def setUp(self):
         self.alice = make_user("+923000004001", "Alice")

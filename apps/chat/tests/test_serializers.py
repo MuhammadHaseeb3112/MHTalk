@@ -461,6 +461,7 @@ class ChatRoomSerializerTest(TestCase):
                 "participants_count",
                 "participants",
                 "last_message",
+                "last_reaction",
                 "created_at",
                 "updated_at",
                 "created_by_id",
@@ -603,4 +604,4 @@ class ChatRoomDetailSerializerTest(TestCase):
         self.assertEqual(
             serializer.data["name"],
             "Office",
-        )
+        )

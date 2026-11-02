@@ -37,7 +37,7 @@ export default function JoinGroupDialog({ code }) {
   const openRoom = async (roomId) => {
     await loadRooms().catch(() => {});
     navigate("/", { replace: true });
-    window.dispatchEvent(new CustomEvent("whatsup:open-room", { detail: Number(roomId) }));
+    window.dispatchEvent(new CustomEvent("mhtalk:open-room", { detail: Number(roomId) }));
   };
 
   const join = async () => {

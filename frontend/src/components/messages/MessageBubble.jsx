@@ -278,9 +278,19 @@ function CallCard({ event, myId, onCall }) {
   );
 }
 
-function StatusReactionCard({ payload }) {
+function StatusReactionCard({ payload, onOpen }) {
   return (
-    <div className="status-reaction">
+    <div
+      className="status-reaction is-clickable"
+      role="button"
+      tabIndex={0}
+      title="View status"
+      onClick={(event) => {
+        event.stopPropagation();
+        onOpen();
+      }}
+      onKeyDown={(event) => event.key === "Enter" && onOpen()}
+    >
       <div className="status-reaction__preview">
         {payload.status_media && payload.status_type === "IMAGE" ? <img src={mediaUrl(payload.status_media)} alt="" /> : null}
         <span>{payload.status_text || (payload.status_type === "VIDEO" ? "Video status" : payload.status_type === "IMAGE" ? "Photo status" : "Status")}</span>
@@ -407,7 +417,7 @@ function MessageBubble({
       body = <CallCard event={special} myId={myId} onCall={(type) => onAction("call", message, { type })} />;
       break;
     case "status_reaction":
-      body = <StatusReactionCard payload={special} />;
+      body = <StatusReactionCard payload={special} onOpen={() => onAction("openStatus", message, special)} />;
       break;
     case "poll":
       body = <PollCard message={message} myId={myId} userOf={userOf} nameOf={nameOf} onAction={onAction} />;

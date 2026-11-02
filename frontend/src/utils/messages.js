@@ -5,14 +5,14 @@ import { formatPhone } from "./phone";
  * and attachment classification.
  */
 
-export const CALL_PREFIX = "__WHATSUP_CALL_EVENT__:";
-export const STATUS_REACTION_PREFIX = "__WHATSUP_STATUS_REACTION__:";
+export const CALL_PREFIX = "__MHTALK_CALL_EVENT__:";
+export const STATUS_REACTION_PREFIX = "__MHTALK_STATUS_REACTION__:";
 /** Chat notices such as "You turned on disappearing messages." */
-export const SYSTEM_PREFIX = "__WHATSUP_SYSTEM__:";
-export const GROUP_EVENT_PREFIX = "__WHATSUP_GROUP_EVENT__:";
+export const SYSTEM_PREFIX = "__MHTALK_SYSTEM__:";
+export const GROUP_EVENT_PREFIX = "__MHTALK_GROUP_EVENT__:";
 
 export function parseSpecial(content) {
-  if (typeof content !== "string" || !content.includes("__WHATSUP_")) return null;
+  if (typeof content !== "string" || !content.includes("__MHTALK_")) return null;
   const start = content.indexOf("{");
   const end = content.lastIndexOf("}");
   if (start < 0 || end < start) return null;
@@ -250,7 +250,8 @@ export function normalizeRoom(raw, myId) {
     createdById: raw.created_by_id ?? null,
     createdAt: raw.created_at,
     lastMessage: last,
-    activityAt: last?.created_at || raw.updated_at || raw.created_at,
+    lastReaction: raw.last_reaction || null,
+    activityAt: latestTime(last?.created_at, raw.last_reaction?.created_at) || raw.updated_at || raw.created_at,
     unread: Number(raw.unread_count || 0),
     isPinned: Boolean(raw.is_pinned),
     pinnedAt: raw.pinned_at || null,
@@ -343,4 +344,19 @@ export function osmTilePoint(latitude, longitude, zoom = 15) {
 
 export function googleMapsUrl(latitude, longitude) {
   return `https://www.google.com/maps/search/?api=1&query=${Number(latitude)},${Number(longitude)}`;
+}
+
+function latestTime(a, b) {
+  if (!a) return b || null;
+  if (!b) return a;
+  return new Date(a) >= new Date(b) ? a : b;
+}
+
+/** The chat's newest reaction, if it is newer than its last message. */
+export function activeReaction(room) {
+  const reaction = room?.lastReaction;
+  if (!reaction) return null;
+  const last = room.lastMessage;
+  if (last && new Date(last.created_at) >= new Date(reaction.created_at)) return null;
+  return reaction;
 }

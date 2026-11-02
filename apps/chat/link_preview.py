@@ -16,7 +16,7 @@ is checked before connecting:
 
 Results (including "no preview") are cached in the Django cache for a day so
 the composer, the sender and every recipient share one fetch. Tests can allow
-loopback with ``WHATSUP_LINK_PREVIEW_ALLOW_LOOPBACK = True`` to hit a local
+loopback with ``MHTALK_LINK_PREVIEW_ALLOW_LOOPBACK = True`` to hit a local
 ``http.server``; it is never enabled in real settings.
 """
 
@@ -80,7 +80,7 @@ def _check_scheme_and_host(url):
 # ---------------------------------------------------------------- SSRF guard
 
 def _allow_loopback():
-    return bool(getattr(settings, "WHATSUP_LINK_PREVIEW_ALLOW_LOOPBACK", False))
+    return bool(getattr(settings, "MHTALK_LINK_PREVIEW_ALLOW_LOOPBACK", False))
 
 
 def is_public_ip(value, allow_loopback=False):

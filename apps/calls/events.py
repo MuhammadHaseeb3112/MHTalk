@@ -14,7 +14,7 @@ from django.db.models import Q
 
 from .choices import CallStatus, ParticipantState
 
-CALL_EVENT_PREFIX = "__WHATSUP_CALL_EVENT__:"
+CALL_EVENT_PREFIX = "__MHTALK_CALL_EVENT__:"
 
 # Statuses that produce a call card in the conversation.
 FINAL_STATUSES = (

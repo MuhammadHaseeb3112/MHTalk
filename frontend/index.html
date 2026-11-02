@@ -10,7 +10,7 @@
   <script>
     (function () {
       var pref = "system";
-      try { pref = localStorage.getItem("whatsup_theme") || "system"; } catch (e) { /* private mode */ }
+      try { pref = localStorage.getItem("mhtalk_theme") || "system"; } catch (e) { /* private mode */ }
       var light = pref === "light" || (pref !== "dark" && window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches);
       var theme = light ? "light" : "dark";
       document.documentElement.setAttribute("data-theme", theme);

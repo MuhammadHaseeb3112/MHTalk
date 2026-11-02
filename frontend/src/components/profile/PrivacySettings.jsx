@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronRight, ShieldAlert, Trash2, UserX } from "lucide-react";
+import { Check, ChevronRight, Pencil, ShieldAlert, Trash2, UserX } from "lucide-react";
 import { errorMessage } from "../../api/client";
 import { authApi } from "../../api/endpoints";
 import { toast } from "../../services/toast";
@@ -167,7 +167,7 @@ function DeleteAccountView({ onBack }) {
     try {
       await authApi.deleteAccount(normalizePhone(phone), password);
       toast("Your account was deleted");
-      window.dispatchEvent(new Event("whatsup:signed-out"));
+      window.dispatchEvent(new Event("mhtalk:signed-out"));
     } catch (err) {
       setError(errorMessage(err, "Couldn't delete your account."));
       setBusy(false);
@@ -211,6 +211,68 @@ function DeleteAccountView({ onBack }) {
   );
 }
 
+function EmailField({ me }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(me.email || "");
+  const [busy, setBusy] = useState(false);
+
+  async function save(event) {
+    event.preventDefault();
+    const email = value.trim();
+    if (email === (me.email || "")) {
+      setEditing(false);
+      return;
+    }
+    setBusy(true);
+    try {
+      const data = await authApi.updateProfile({ email });
+      dispatch({ type: "me", me: data.user || { ...getState().me, email: email || null } });
+      toast.success(email ? "Email updated" : "Email removed");
+      setEditing(false);
+    } catch (error) {
+      const detail = error?.response?.data?.email;
+      toast.error(Array.isArray(detail) ? detail[0] : errorMessage(error, "Couldn't update the email."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <form className="account-email" onSubmit={save}>
+        <label className="info-label" htmlFor="account-email">Email</label>
+        <div className="account-email__row">
+          <input
+            id="account-email"
+            type="email"
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            onKeyDown={(event) => event.key === "Escape" && setEditing(false)}
+            placeholder="you@example.com"
+            maxLength={254}
+            autoComplete="email"
+            autoFocus
+          />
+          <button type="submit" className="icon-btn" aria-label="Save email" disabled={busy}>
+            {busy ? <Spinner size={16} /> : <Check size={20} />}
+          </button>
+        </div>
+      </form>
+    );
+  }
+  return (
+    <>
+      <span className="info-label">Email</span>
+      <div className="account-email__row">
+        <p className="info-value">{me.email || <span className="info-muted">Not added</span>}</p>
+        <button type="button" className="icon-btn" aria-label={me.email ? "Edit email" : "Add email"} onClick={() => { setValue(me.email || ""); setEditing(true); }}>
+          <Pencil size={18} />
+        </button>
+      </div>
+    </>
+  );
+}
+
 export function AccountView({ onBack }) {
   const me = useStore((state) => state.me);
   const [sub, setSub] = useState(null);
@@ -222,12 +284,7 @@ export function AccountView({ onBack }) {
         <div className="account-info info-pad">
           <span className="info-label">Phone number</span>
           <p className="info-value">{formatPhone(me.phone_number)}</p>
-          {me.email ? (
-            <>
-              <span className="info-label">Email</span>
-              <p className="info-value">{me.email}</p>
-            </>
-          ) : null}
+          <EmailField me={me} />
           <span className="info-label">Member since</span>
           <p className="info-value">{detailTime(me.date_joined)}</p>
         </div>

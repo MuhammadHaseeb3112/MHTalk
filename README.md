@@ -6,6 +6,7 @@
 
 Chats, groups, voice and video calls (including group calls), status updates, polls, view once and disappearing messages, push notifications, and an installable app, built end to end with Django, Channels, PostgreSQL, Redis, React and WebRTC, tested, and deployed with Docker.
 
+[![CI](https://github.com/MuhammadHaseeb3112/MHTalk/actions/workflows/django.yml/badge.svg)](https://github.com/MuhammadHaseeb3112/MHTalk/actions/workflows/django.yml)
 ![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
 ![Django](https://img.shields.io/badge/Django-6-092E20?logo=django&logoColor=white)
 ![Channels](https://img.shields.io/badge/Django%20Channels-WebSockets-44B78B)
@@ -182,7 +183,7 @@ production). Templates: [`.env.example`](.env.example) and [`deploy/env.prod.exa
 | `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS` | Frontend served from another domain |
 | `TURN_URLS` + `TURN_SECRET` (or `TURN_USERNAME` / `TURN_PASSWORD`) | TURN relay for calls |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web Push (`python manage.py generate_vapid_keys`) |
-| `WHATSUP_AI_PROVIDER`, `WHATSUP_AI_API_KEY` | MHTalk AI (`gemini` and `groq` have free keys) |
+| `MHTALK_AI_PROVIDER`, `MHTALK_AI_API_KEY` | MHTalk AI (`gemini` and `groq` have free keys) |
 | `USE_S3_MEDIA`, `S3_*` | Store uploads in S3 / Cloudflare R2 / Backblaze B2 |
 | `THROTTLE_*` | Rate limits (auth, anonymous, user, invite links, link previews) |
 | `WEB_CONCURRENCY`, `DB_POOL_MAX_SIZE` | Worker processes and DB connections per worker |

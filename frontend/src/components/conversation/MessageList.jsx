@@ -183,14 +183,14 @@ export default function MessageList({ room, me, contactMap, selectMode, selected
       const id = takePendingJump(room.id);
       if (id) jumpTo(id);
     };
-    window.addEventListener("whatsup:jump-to", handler);
-    window.addEventListener("whatsup:jump-pending", onPending);
+    window.addEventListener("mhtalk:jump-to", handler);
+    window.addEventListener("mhtalk:jump-pending", onPending);
     // A jump requested before this chat was opened.
     const id = takePendingJump(room.id);
     if (id) jumpTo(id);
     return () => {
-      window.removeEventListener("whatsup:jump-to", handler);
-      window.removeEventListener("whatsup:jump-pending", onPending);
+      window.removeEventListener("mhtalk:jump-to", handler);
+      window.removeEventListener("mhtalk:jump-pending", onPending);
     };
   }, [jumpTo, room.id]);
 

@@ -80,7 +80,7 @@ export const EMOJI_KEYWORDS = {
   "📷": "camera photo", "💰": "money", "🇵🇰": "pakistan flag",
 };
 
-const RECENT_KEY = "whatsup_recent_emoji";
+const RECENT_KEY = "mhtalk_recent_emoji";
 
 export function recentEmoji() {
   try {

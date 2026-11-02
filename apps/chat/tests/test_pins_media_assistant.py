@@ -83,13 +83,13 @@ class AssistantTests(TestCase):
         self.client = APIClient()
         self.client.force_authenticate(make_user("+923000000871"))
 
-    @override_settings(WHATSUP_AI_API_KEY="")
+    @override_settings(MHTALK_AI_API_KEY="")
     def test_disabled_without_a_key(self):
         self.assertFalse(self.client.get("/api/chat/ai/").data["enabled"])
         response = self.client.post("/api/chat/ai/", {"messages": [{"role": "user", "content": "hi"}]}, format="json")
         self.assertEqual(response.status_code, 503)
 
-    @override_settings(WHATSUP_AI_API_KEY="test-key")
+    @override_settings(MHTALK_AI_API_KEY="test-key")
     def test_relays_the_conversation(self):
         with mock.patch("apps.chat.assistant.call_model", return_value="Hello!") as call:
             response = self.client.post(
@@ -104,7 +104,7 @@ class AssistantTests(TestCase):
         self.assertEqual(call.call_args[0][1]["key"], "test-key")
         self.assertEqual(call.call_args[0][1]["provider"], "gemini")
 
-    @override_settings(WHATSUP_AI_API_KEY="free-key", WHATSUP_AI_PROVIDER="gemini", WHATSUP_AI_MODEL="")
+    @override_settings(MHTALK_AI_API_KEY="free-key", MHTALK_AI_PROVIDER="gemini", MHTALK_AI_MODEL="")
     def test_gemini_uses_the_openai_compatible_endpoint(self):
         import io
         import json
@@ -132,12 +132,12 @@ class AssistantTests(TestCase):
         self.assertEqual(captured["body"]["model"], "gemini-3.5-flash-lite")
         self.assertEqual(captured["body"]["messages"][0]["role"], "system")
 
-    @override_settings(WHATSUP_AI_API_KEY="gsk_x", WHATSUP_AI_PROVIDER="groq")
+    @override_settings(MHTALK_AI_API_KEY="gsk_x", MHTALK_AI_PROVIDER="groq")
     def test_status_reports_the_provider(self):
         data = self.client.get("/api/chat/ai/").data
         self.assertEqual((data["enabled"], data["provider"]), (True, "groq"))
 
-    @override_settings(WHATSUP_AI_API_KEY="test-key")
+    @override_settings(MHTALK_AI_API_KEY="test-key")
     def test_rejects_bad_history(self):
         response = self.client.post("/api/chat/ai/", {"messages": [{"role": "system", "content": "x"}]}, format="json")
         self.assertEqual(response.status_code, 400)

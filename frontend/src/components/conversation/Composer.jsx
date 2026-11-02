@@ -257,7 +257,7 @@ export default function Composer({ room, replyTo, editing, onClearReply, onClear
       else if (replyTo) onClearReply();
     }
     if (event.key === "ArrowUp" && !text) {
-      window.dispatchEvent(new CustomEvent("whatsup:edit-last"));
+      window.dispatchEvent(new CustomEvent("mhtalk:edit-last"));
     }
   }
 

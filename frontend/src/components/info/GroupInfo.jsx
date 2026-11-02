@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { useStarredCount } from "../../hooks";
 import { Bell, BellOff, Camera, Check, Eraser, Heart, HeartOff, Link2, LogOut, MessageSquare, Pencil, Settings2, ShieldCheck, ShieldOff, Star, Timer, Trash2, UserMinus, UserPlus, X } from "lucide-react";
 import { errorMessage } from "../../api/client";
 import { chatApi } from "../../api/endpoints";
@@ -62,6 +63,7 @@ export default function GroupInfo({ roomId }) {
   const app = useApp();
   const room = useStore((state) => state.rooms[roomId]);
   const me = useStore((state) => state.me);
+  const starredCount = useStarredCount(roomId);
   const contacts = useStore((state) => state.contacts);
   const contactMap = useMemo(() => contactsByUser(contacts), [contacts]);
   const [memberQuery, setMemberQuery] = useState("");
@@ -201,7 +203,7 @@ export default function GroupInfo({ roomId }) {
         <MediaSummary roomId={room.id} onOpen={() => app.openDrawer("media", { roomId: room.id })} />
 
         <div className="info-section info-section--list">
-          <InfoRow icon={Star} title="Starred messages" onClick={() => app.pushPanel("starred", { roomId: room.id })} />
+          <InfoRow icon={Star} title="Starred messages" onClick={() => app.pushPanel("starred", { roomId: room.id })} trailing={starredCount ? <span className="info-action__count">{starredCount}</span> : null} />
           {isMember ? (
             <InfoRow
               icon={Timer}

@@ -326,6 +326,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 message_id,
                 emoji,
             )
+            await self.announce_room_activity("reaction")
 
             return
         
@@ -768,6 +769,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
             },
         )
 
+    async def announce_room_activity(self, action):
+        """Tell every member's inbox to refresh this chat in their list."""
+        user_ids = await database_sync_to_async(
+            lambda: list(Participant.objects.filter(room_id=self.room_id).values_list("user_id", flat=True))
+        )()
+        for user_id in user_ids:
+            await self.channel_layer.group_send(
+                f"chat_inbox_{user_id}",
+                {"type": "inbox.room_changed", "room_id": int(self.room_id), "action": action},
+            )
+
     async def broadcast_reaction(
         self,
         message_id: int,
@@ -1084,8 +1096,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             user=self.user,
             defaults={
                 "emoji": emoji,
+                # A changed reaction is the newest activity again (chat list).
+                "created_at": timezone.now(),
             },
         )
+        ChatRoom.objects.filter(pk=message.room_id).update(updated_at=timezone.now())
 
         return reaction
 
@@ -1266,7 +1281,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             is_deleted=False,
             message_type=MessageType.TEXT,
         ).first()
-        if message is None or str(message.content or "").startswith("__WHATSUP_"):
+        if message is None or str(message.content or "").startswith("__MHTALK_"):
             return 0
         if not edit_window_open(message):
             return 0

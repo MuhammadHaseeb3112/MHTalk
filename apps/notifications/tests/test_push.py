@@ -24,7 +24,7 @@ VAPID = dict(
     VAPID_PUBLIC_KEY="BPPxw3uTGrzf0H2UMi30vRraon66qFpw0SM9iDVxgzZYCvA1XZ-TKGAOrDYtEUtZn5Qi1tVHPNVTAwqMAkH8l30",
     VAPID_PRIVATE_KEY="GLZweAPIBcAhoR4iggtlBNA85AV4nTzSWR5BsjUvETk",
     VAPID_SUBJECT="mailto:test@example.com",
-    WHATSUP_PUSH_INLINE=True,
+    MHTALK_PUSH_INLINE=True,
 )
 P256DH = "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM"
 AUTH = "tBHItJI5svbpez7KI4CCXg"
@@ -251,7 +251,7 @@ class MessagePushTests(TestCase):
         self.assertEqual(endpoint, self.bob_sub.endpoint)
         self.assertEqual(payload["body"], "📞 Missed video call")
         self.assertEqual(payload["call_id"], missed.id)
-        self.assertNotIn("__WHATSUP_", json.dumps(payload))
+        self.assertNotIn("__MHTALK_", json.dumps(payload))
 
         webpush.reset_mock()
         answered = Call.objects.create(
@@ -352,7 +352,7 @@ class FeatureMessagePushTests(TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             post_group_event(self.group, self.alice, "renamed", "Alice changed the group name")
             notice = Message.objects.create(
-                room=self.group, sender=self.alice, content='__WHATSUP_SYSTEM__:{"kind":"disappearing","seconds":86400}'
+                room=self.group, sender=self.alice, content='__MHTALK_SYSTEM__:{"kind":"disappearing","seconds":86400}'
             )
             broadcast_message(get_message_with_relations(notice.pk))
         webpush.assert_not_called()

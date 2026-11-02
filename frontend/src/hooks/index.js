@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { messageApi } from "../api/endpoints";
 
 /** Value that only updates after `delay` ms without changes (search inputs). */
 export function useDebouncedValue(value, delay = 300) {
@@ -84,4 +85,24 @@ export function useEvent(handler) {
     ref.current = handler;
   });
   return useCallback((...args) => ref.current(...args), []);
+}
+
+/** Number of starred messages in a chat (shown next to "Starred messages"). */
+export function useStarredCount(roomId) {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    const load = () =>
+      messageApi
+        .starred()
+        .then((rows) => alive && setCount(rows.filter((row) => Number(row.room_id) === Number(roomId)).length))
+        .catch(() => {});
+    load();
+    window.addEventListener("mhtalk:starred-changed", load);
+    return () => {
+      alive = false;
+      window.removeEventListener("mhtalk:starred-changed", load);
+    };
+  }, [roomId]);
+  return count;
 }

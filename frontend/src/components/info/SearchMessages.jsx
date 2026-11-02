@@ -25,7 +25,7 @@ export default function SearchMessages({ roomId }) {
     let cancelled = false;
     messageApi
       .search(roomId, term)
-      .then((rows) => !cancelled && setResult({ term, rows: rows.filter((row) => !String(row.content || "").startsWith("__WHATSUP_")), error: "" }))
+      .then((rows) => !cancelled && setResult({ term, rows: rows.filter((row) => !String(row.content || "").startsWith("__MHTALK_")), error: "" }))
       .catch((err) => !cancelled && setResult({ term, rows: [], error: errorMessage(err) }));
     return () => {
       cancelled = true;
@@ -51,7 +51,7 @@ export default function SearchMessages({ roomId }) {
               key={row.id}
               type="button"
               className="row search-hit-row"
-              onClick={() => window.dispatchEvent(new CustomEvent("whatsup:jump-to", { detail: row.id }))}
+              onClick={() => window.dispatchEvent(new CustomEvent("mhtalk:jump-to", { detail: row.id }))}
             >
               <span className="row__body">
                 <span className="row__title row__title--small">

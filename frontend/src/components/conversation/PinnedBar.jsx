@@ -30,8 +30,8 @@ export default function PinnedBar({ room, me, canPin }) {
     const onChange = (event) => {
       if (Number(event.detail?.roomId) === Number(roomId)) setRefresh((value) => value + 1);
     };
-    window.addEventListener("whatsup:pins-changed", onChange);
-    return () => window.removeEventListener("whatsup:pins-changed", onChange);
+    window.addEventListener("mhtalk:pins-changed", onChange);
+    return () => window.removeEventListener("mhtalk:pins-changed", onChange);
   }, [roomId]);
 
   useEffect(() => {
@@ -50,7 +50,7 @@ export default function PinnedBar({ room, me, canPin }) {
   const current = pins[index];
 
   const goTo = useCallback((message) => {
-    window.dispatchEvent(new CustomEvent("whatsup:jump-to", { detail: message.id }));
+    window.dispatchEvent(new CustomEvent("mhtalk:jump-to", { detail: message.id }));
   }, []);
 
   if (!current) return null;

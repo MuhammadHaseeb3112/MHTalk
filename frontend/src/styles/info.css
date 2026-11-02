@@ -675,3 +675,33 @@ kbd {
   vertical-align: -4px;
   color: var(--accent);
 }
+
+/* Account → editable email */
+.account-email__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.account-email__row .info-value {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.account-email__row input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 0;
+  border: 0;
+  border-bottom: 2px solid var(--accent);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  outline: none;
+}
+.account-email {
+  display: contents;
+}
+.info-action__count {
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+}

@@ -37,8 +37,8 @@ BODY_LIMIT = 180
 ICON_URL = "/pwa-192.png"
 BADGE_URL = "/pwa-badge-96.png"
 
-CALL_EVENT_PREFIX = "__WHATSUP_CALL_EVENT__:"
-STATUS_REACTION_PREFIX = "__WHATSUP_STATUS_REACTION__:"
+CALL_EVENT_PREFIX = "__MHTALK_CALL_EVENT__:"
+STATUS_REACTION_PREFIX = "__MHTALK_STATUS_REACTION__:"
 
 _executor = None
 _executor_lock = Lock()
@@ -77,8 +77,8 @@ def _get_executor():
 
 
 def _run_in_background(func, *args):
-    """Run ``func`` on the push pool (inline when WHATSUP_PUSH_INLINE, e.g. tests)."""
-    if getattr(settings, "WHATSUP_PUSH_INLINE", False):
+    """Run ``func`` on the push pool (inline when MHTALK_PUSH_INLINE, e.g. tests)."""
+    if getattr(settings, "MHTALK_PUSH_INLINE", False):
         func(*args)
         return
 
@@ -278,7 +278,7 @@ def _send_message_pushes(message_id, hidden_user_ids):
     elif content.startswith(STATUS_REACTION_PREFIX):
         event = _special_payload(content)
         text = f"Reacted {event.get('emoji', '')} to your status".replace("  ", " ")
-    elif content.startswith("__WHATSUP_"):
+    elif content.startswith("__MHTALK_"):
         # System notices / group events ("X added Y", disappearing timer...)
         # and any other internal payloads never notify.
         return 0

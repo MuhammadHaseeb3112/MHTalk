@@ -779,3 +779,9 @@ mark.search-hit {
 .bubble:not(.bubble--document, .bubble--call, .bubble--voice, .bubble--audio, .bubble--emoji):not(:has(.bubble__text, .bubble__deleted, .bubble__meta--overlay)) {
   padding-bottom: 20px;
 }
+.status-reaction.is-clickable {
+  cursor: pointer;
+}
+.status-reaction.is-clickable:hover .status-reaction__preview {
+  filter: brightness(1.08);
+}

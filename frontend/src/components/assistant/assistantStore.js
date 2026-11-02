@@ -11,7 +11,7 @@ const listeners = new Set();
 let state = { userId: null, messages: [], sending: false, status: null };
 
 function key(userId) {
-  return `whatsup-ai-chat-${userId}`;
+  return `mhtalk-ai-chat-${userId}`;
 }
 
 function emit(next) {

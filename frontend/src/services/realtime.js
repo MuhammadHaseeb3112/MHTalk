@@ -42,7 +42,7 @@ const MAX_BACKOFF = 15000;
  */
 function announceReceipt(messageId) {
   const id = Number(messageId);
-  if (id) window.dispatchEvent(new CustomEvent("whatsup:receipt", { detail: id }));
+  if (id) window.dispatchEvent(new CustomEvent("mhtalk:receipt", { detail: id }));
 }
 
 export class ManagedSocket {
@@ -194,7 +194,7 @@ function notifyNewMessage(message, room) {
     if (user?.phone_number) body = body.split(`@${user.phone_number}`).join(`@${Number(id) === Number(state.me?.id) ? "You" : nameOf(id)}`);
   });
   showDesktopNotification(title, body, () => {
-    window.dispatchEvent(new CustomEvent("whatsup:open-room", { detail: room.id }));
+    window.dispatchEvent(new CustomEvent("mhtalk:open-room", { detail: room.id }));
   });
 }
 
@@ -317,7 +317,7 @@ class Realtime {
       }
       case "profile.updated":
         scheduleRoomsReload(400);
-        if (Number(data.user_id) === Number(me?.id)) window.dispatchEvent(new Event("whatsup:me-changed"));
+        if (Number(data.user_id) === Number(me?.id)) window.dispatchEvent(new Event("mhtalk:me-changed"));
         break;
       case "contacts.updated":
         loadContacts();
@@ -329,14 +329,14 @@ class Realtime {
         // This account was deleted (here or on another device): sign out
         // before the server closes the socket.
         this.stop();
-        window.dispatchEvent(new Event("whatsup:signed-out"));
+        window.dispatchEvent(new Event("mhtalk:signed-out"));
         break;
       case "status.updated":
         scheduleStatusReload();
         break;
       case "calls.updated":
         loadCalls();
-        window.dispatchEvent(new CustomEvent("whatsup:call-changed", { detail: data }));
+        window.dispatchEvent(new CustomEvent("mhtalk:call-changed", { detail: data }));
         break;
       default:
         break;

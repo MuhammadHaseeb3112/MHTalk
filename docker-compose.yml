@@ -1,7 +1,7 @@
 services:
   web:
     build: .
-    container_name: whatsup_backend
+    container_name: mhtalk_backend
     command: python manage.py runserver 0.0.0.0:8000
     volumes:
       - .:/app
@@ -18,14 +18,14 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: whatsup_redis
+    container_name: mhtalk_redis
     expose:
       - "6379"
     restart: unless-stopped
 
   db:
     image: postgres:17-alpine
-    container_name: whatsup_postgres
+    container_name: mhtalk_postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}

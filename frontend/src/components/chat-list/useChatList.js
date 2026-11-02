@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useStore } from "../../store/store";
-import { contactsByUser, displayUserName, previewText, readableMentions, roomTitle, sortRooms } from "../../utils/messages";
+import { contactsByUser, displayUserName, previewText, readableMentions, roomTitle, sortRooms, activeReaction } from "../../utils/messages";
 import { phoneDigits } from "../../utils/phone";
 
 /** Typing label for a room ("typing…" / "Ali is typing…"). */
@@ -57,12 +57,21 @@ export function useChatList({ filter = "all", archived = false, query = "" }) {
         const user = room.participants.find((p) => Number(p.user?.id) === Number(id))?.user;
         return user ? displayUserName(user, contactMap) : "Someone";
       };
-      const preview = last ? readableMentions(previewText(last, me?.id, nameOfId), last, room.participants, nameOfId) : "";
+      let preview = last ? readableMentions(previewText(last, me?.id, nameOfId), last, room.participants, nameOfId) : "";
+      const reaction = activeReaction(room);
+      if (reaction) {
+        // WhatsApp: "Reacted 😂 to: "Voice message"" / "You reacted …" / "Bilal reacted …"
+        const target = reaction.message ? previewText(reaction.message, me?.id, nameOfId) : "a message";
+        const mine = Number(reaction.user_id) === Number(me?.id);
+        const who = mine ? "You reacted" : room.isGroup ? `${nameOfId(reaction.user_id)} reacted` : "Reacted";
+        preview = `${who} ${reaction.emoji} to: "${target}"`;
+      }
       return {
         room,
         title,
         senderName,
         preview,
+        reacted: Boolean(reaction),
         typingText: typingLabel(room, typing[room.id], contactMap, me),
       };
     });

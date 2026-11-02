@@ -233,7 +233,7 @@ export default function ChatListPanel() {
 
         {searchingActive && rows.length ? <div className="section-label">Chats</div> : null}
         <div className="list-pad">
-          {rows.map(({ room, title, senderName, preview, typingText }) => (
+          {rows.map(({ room, title, senderName, preview, reacted, typingText }) => (
             <ChatListItem
               key={room.id}
               room={room}
@@ -241,6 +241,7 @@ export default function ChatListPanel() {
               me={me}
               senderName={senderName}
               preview={preview}
+              reacted={reacted}
               typingText={typingText}
               active={room.id === activeRoomId}
               selectMode={selectMode}

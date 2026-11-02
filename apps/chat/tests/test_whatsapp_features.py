@@ -136,7 +136,7 @@ class MessageRuleTests(TestCase):
         self.client.post("/api/chat/messages/react/", {"message": message.id, "emoji": ""}, format="json")
         self.assertEqual(message.reactions.count(), 0)
 
-    @override_settings(MEDIA_ROOT="/tmp/whatsup_test_media")
+    @override_settings(MEDIA_ROOT="/tmp/mhtalk_test_media")
     def test_upload_validation_and_shared_media(self):
         empty = SimpleUploadedFile("empty.png", b"", content_type="image/png")
         bad = self.client.post("/api/chat/messages/upload/", {"room": self.room.id, "message_type": "IMAGE", "file": empty}, format="multipart")
@@ -277,5 +277,5 @@ class MissedCallTests(TestCase):
         client.force_authenticate(callee)
         self.assertEqual(client.post(f"/api/calls/{call.id}/reject/").status_code, 200)
         card = Message.objects.get(client_message_id=f"call-event-{call.id}")
-        self.assertTrue(card.content.startswith("__WHATSUP_CALL_EVENT__:"))
+        self.assertTrue(card.content.startswith("__MHTALK_CALL_EVENT__:"))
         self.assertIn('"status":"REJECTED"', card.content)
