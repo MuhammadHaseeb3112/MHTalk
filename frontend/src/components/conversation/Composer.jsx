@@ -39,7 +39,10 @@ export default function Composer({ room, replyTo, editing, onClearReply, onClear
   const [text, setText] = useState(() => drafts.get(room.id) || "");
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [attachAnchor, setAttachAnchor] = useState(null);
-  const [recording, setRecording] = useState(false);
+  const [recording, setRecording] = useState(false); // false | "tap" | "hold"
+  const [gesture, setGesture] = useState({ dx: 0, dy: 0, locked: false });
+  const recorderControl = useRef(null);
+  const holdCleanup = useRef(null);
   const [shareContact, setShareContact] = useState(false);
   const [pollOpen, setPollOpen] = useState(false);
   const [locationOpen, setLocationOpen] = useState(false);
@@ -291,6 +294,59 @@ export default function Composer({ room, replyTo, editing, onClearReply, onClear
     };
   }
 
+  // WhatsApp-style mic: tap opens the recorder; press and hold records,
+  // release sends, slide left cancels, slide up locks (hands-free).
+  function onMicPointerDown(event) {
+    if (editing || (event.pointerType === "mouse" && event.button !== 0)) return;
+    event.preventDefault();
+    const hold = { id: event.pointerId, x: event.clientX, y: event.clientY, active: false };
+    const finish = () => {
+      window.clearTimeout(hold.timer);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+      holdCleanup.current = null;
+    };
+    function onMove(moveEvent) {
+      if (moveEvent.pointerId !== hold.id || !hold.active) return;
+      const dx = Math.min(0, moveEvent.clientX - hold.x);
+      const dy = Math.min(0, moveEvent.clientY - hold.y);
+      if (dy < -80) {
+        finish();
+        setGesture({ dx: 0, dy: 0, locked: true });
+        return;
+      }
+      if (dx < -120) {
+        finish();
+        recorderControl.current?.cancel();
+        return;
+      }
+      setGesture({ dx, dy, locked: false });
+    }
+    function onUp(upEvent) {
+      if (upEvent.pointerId !== hold.id) return;
+      finish();
+      if (hold.active) recorderControl.current?.release();
+      else setRecording("tap");
+    }
+    function onCancel(cancelEvent) {
+      if (cancelEvent.pointerId !== hold.id) return;
+      finish();
+      if (hold.active) recorderControl.current?.cancel();
+    }
+    hold.timer = window.setTimeout(() => {
+      hold.active = true;
+      setGesture({ dx: 0, dy: 0, locked: false });
+      setRecording("hold");
+    }, 250);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
+    holdCleanup.current = finish;
+  }
+
+  useEffect(() => () => holdCleanup.current?.(), []);
+
   async function sendVoiceNote(blob, seconds, waveform, viewOnce) {
     setRecording(false);
     await sendVoice(room.id, blob, seconds, waveform, viewOnce);
@@ -377,7 +433,13 @@ export default function Composer({ room, replyTo, editing, onClearReply, onClear
       ) : null}
       {emojiOpen ? <EmojiPicker className="emoji-picker--composer" onPick={insertEmoji} onClose={() => setEmojiOpen(false)} ignoreRefs={[emojiBtnRef]} /> : null}
       {recording ? (
-        <VoiceRecorder onCancel={() => setRecording(false)} onSend={sendVoiceNote} />
+        <VoiceRecorder
+          hold={recording === "hold" && !gesture.locked}
+          gesture={gesture}
+          ref={recorderControl}
+          onCancel={() => setRecording(false)}
+          onSend={sendVoiceNote}
+        />
       ) : (
         <div className="composer__row">
           <div className="composer__pill">
@@ -420,7 +482,19 @@ export default function Composer({ room, replyTo, editing, onClearReply, onClear
                 <Send size={22} />
               </button>
             ) : (
-              <button type="button" className="icon-btn composer__mic" onClick={() => setRecording(true)} aria-label="Record voice message" disabled={Boolean(editing)}>
+              <button
+                type="button"
+                className="icon-btn composer__mic"
+                onPointerDown={onMicPointerDown}
+                onClick={(event) => {
+                  // Keyboard (Enter/Space) only: pointer taps are handled on pointerup.
+                  if (event.detail === 0) setRecording("tap");
+                }}
+                onContextMenu={(event) => event.preventDefault()}
+                aria-label="Record voice message"
+                data-tooltip="Click to record, or hold to talk"
+                disabled={Boolean(editing)}
+              >
                 <Mic size={23} />
               </button>
             )}

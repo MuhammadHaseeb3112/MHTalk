@@ -7,8 +7,9 @@ forwards it to the AI provider, so the key never reaches the browser.
 Configure it in ``.env`` (free options first):
 
     # Google Gemini - free key from https://aistudio.google.com/apikey
+    # (new "AQ." auth keys and older "AIza" keys both work)
     MHTALK_AI_PROVIDER=gemini
-    MHTALK_AI_API_KEY=AIza...
+    MHTALK_AI_API_KEY=AQ....
 
     # Groq - free key from https://console.groq.com/keys
     MHTALK_AI_PROVIDER=groq
@@ -37,11 +38,14 @@ from rest_framework.views import APIView
 logger = logging.getLogger(__name__)
 
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
+# Gemini's native API. Google's new "AQ." auth keys only work here, not on
+# its OpenAI-compatible endpoint.
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
-# OpenAI-compatible chat-completions endpoints (Gemini and Groq both offer one).
+# Chat-completions endpoints (OpenAI-compatible for Groq / OpenAI / custom).
 PROVIDERS = {
     "gemini": {
-        "url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+        "url": GEMINI_URL,
         "model": "gemini-3.5-flash-lite",
         "label": "Google Gemini",
     },
@@ -76,6 +80,7 @@ def ai_settings():
     preset = PROVIDERS[provider]
     base_url = (getattr(settings, "MHTALK_AI_BASE_URL", "") or "").strip().rstrip("/")
     url = preset["url"]
+    native_gemini = provider == "gemini" and not base_url
     if base_url and provider != "anthropic":
         url = base_url if base_url.endswith("/chat/completions") else f"{base_url}/chat/completions"
     return {
@@ -84,6 +89,7 @@ def ai_settings():
         "url": url,
         "key": (getattr(settings, "MHTALK_AI_API_KEY", "") or "").strip(),
         "model": (getattr(settings, "MHTALK_AI_MODEL", "") or "").strip() or preset["model"],
+        "native_gemini": native_gemini,
     }
 
 
@@ -109,6 +115,26 @@ def call_model(messages, config, timeout=60):
         )
         parts = [block.get("text", "") for block in payload.get("content", []) if block.get("type") == "text"]
         return "".join(parts).strip()
+
+    if config.get("native_gemini"):
+        payload = _post_json(
+            config["url"].format(model=config["model"]),
+            {
+                "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+                "contents": [
+                    {"role": "model" if item["role"] == "assistant" else "user", "parts": [{"text": item["content"]}]}
+                    for item in messages
+                ],
+                "generationConfig": {"maxOutputTokens": 1024},
+            },
+            {"x-goog-api-key": config["key"]},
+            timeout,
+        )
+        candidates = payload.get("candidates") or []
+        if not candidates:
+            return ""
+        parts = (candidates[0].get("content") or {}).get("parts") or []
+        return "".join(part.get("text", "") for part in parts if isinstance(part, dict) and not part.get("thought")).strip()
 
     payload = _post_json(
         config["url"],
@@ -200,7 +226,7 @@ class AssistantAPIView(APIView):
             except Exception:  # noqa: BLE001
                 pass
             logger.warning("MHTalk AI request failed: %s %s", error.code, detail)
-            if error.code in (401, 403) or (error.code == 400 and "key" in detail.lower()):
+            if error.code in (401, 403) or (error.code == 400 and ("key" in detail.lower() or "auth" in detail.lower())):
                 message = "The AI key was rejected. Check MHTALK_AI_API_KEY and MHTALK_AI_PROVIDER."
             elif error.code == 429:
                 message = "The free AI limit was reached for now. Please wait a minute and try again."

@@ -21,7 +21,9 @@ import { useApp } from "../layout/AppContext";
  */
 export function ContactForm({ contact, initialPhone = "", onDone, onCancel, openChatOnCreate = true }) {
   const isEdit = Boolean(contact);
-  const [name, setName] = useState(contact?.name || "");
+  // null = not typed yet: the name then follows the person's own profile
+  // name (set when they signed up), which you can keep or change.
+  const [typedName, setTypedName] = useState(contact ? contact.name || "" : null);
   const [phone, setPhone] = useState(contact?.contact_user?.phone_number || initialPhone);
   const debouncedPhone = useDebouncedValue(phone, 450);
   const [busy, setBusy] = useState(false);
@@ -54,6 +56,9 @@ export function ContactForm({ contact, initialPhone = "", onDone, onCancel, open
   if (!looksLikePhone(term)) lookup = { state: "idle" };
   else if (isEdit && !phoneChanged) lookup = { state: "found", data: { user: contact.contact_user } };
   else lookup = lookupResult.term === term ? lookupResult : { state: "loading" };
+  const suggestedName = !isEdit && lookup.state === "found" ? profileName(lookup.data.user) : "";
+  const name = typedName ?? suggestedName;
+  const setName = setTypedName;
 
   async function submit(event) {
     event.preventDefault();

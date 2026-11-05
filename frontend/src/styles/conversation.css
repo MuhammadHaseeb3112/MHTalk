@@ -243,6 +243,40 @@
   }
 }
 
+/* Phones: WhatsApp-style plain header icons, so the name gets the room. */
+@media (max-width: 560px) {
+  .conv-header {
+    gap: 4px;
+    padding: 0 4px 0 6px;
+  }
+  .conv-header__who {
+    gap: 10px;
+  }
+  .conv-header__actions {
+    gap: 0;
+  }
+  .call-buttons {
+    border: 0;
+    margin-right: 0;
+  }
+  .call-buttons__btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+  }
+  .call-buttons__btn + .call-buttons__btn {
+    border-left: 0;
+  }
+  .conv-header__actions .icon-btn {
+    width: 40px;
+    height: 40px;
+  }
+  .unknown-banner__actions {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+
 /* Unknown number banner (chat with someone who isn't a saved contact) */
 .unknown-banner {
   position: relative;

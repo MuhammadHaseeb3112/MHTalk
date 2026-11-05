@@ -104,8 +104,7 @@ class AssistantTests(TestCase):
         self.assertEqual(call.call_args[0][1]["key"], "test-key")
         self.assertEqual(call.call_args[0][1]["provider"], "gemini")
 
-    @override_settings(MHTALK_AI_API_KEY="free-key", MHTALK_AI_PROVIDER="gemini", MHTALK_AI_MODEL="")
-    def test_gemini_uses_the_openai_compatible_endpoint(self):
+    def _capture(self, reply_payload):
         import io
         import json
 
@@ -120,17 +119,56 @@ class AssistantTests(TestCase):
 
         def fake_urlopen(request, timeout=None):
             captured["url"] = request.full_url
-            captured["auth"] = request.get_header("Authorization")
+            captured["headers"] = {k.lower(): v for k, v in request.header_items()}
             captured["body"] = json.loads(request.data)
-            return FakeResponse(json.dumps({"choices": [{"message": {"content": "Salam!"}}]}).encode())
+            return FakeResponse(json.dumps(reply_payload).encode())
 
-        with mock.patch("apps.chat.assistant.urllib.request.urlopen", fake_urlopen):
-            response = self.client.post("/api/chat/ai/", {"messages": [{"role": "user", "content": "hi"}]}, format="json")
+        return captured, fake_urlopen
+
+    @override_settings(MHTALK_AI_API_KEY="AQ.free-key", MHTALK_AI_PROVIDER="gemini", MHTALK_AI_MODEL="", MHTALK_AI_BASE_URL="")
+    def test_gemini_uses_the_native_endpoint(self):
+        captured, fake = self._capture({"candidates": [{"content": {"parts": [{"text": "Salam!"}]}}]})
+        history = [
+            {"role": "user", "content": "hi"},
+            {"role": "assistant", "content": "Hello"},
+            {"role": "user", "content": "kya haal hai"},
+        ]
+        with mock.patch("apps.chat.assistant.urllib.request.urlopen", fake):
+            response = self.client.post("/api/chat/ai/", {"messages": history}, format="json")
         self.assertEqual(response.data["reply"], "Salam!")
-        self.assertIn("generativelanguage.googleapis.com", captured["url"])
-        self.assertEqual(captured["auth"], "Bearer free-key")
-        self.assertEqual(captured["body"]["model"], "gemini-3.5-flash-lite")
+        self.assertEqual(
+            captured["url"],
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
+        )
+        self.assertEqual(captured["headers"]["x-goog-api-key"], "AQ.free-key")
+        self.assertNotIn("authorization", captured["headers"])
+        self.assertEqual([c["role"] for c in captured["body"]["contents"]], ["user", "model", "user"])
+        self.assertIn("MHTalk AI", captured["body"]["systemInstruction"]["parts"][0]["text"])
+
+    @override_settings(MHTALK_AI_API_KEY="gsk_x", MHTALK_AI_PROVIDER="groq", MHTALK_AI_MODEL="")
+    def test_groq_uses_the_openai_compatible_endpoint(self):
+        captured, fake = self._capture({"choices": [{"message": {"content": "Hi"}}]})
+        with mock.patch("apps.chat.assistant.urllib.request.urlopen", fake):
+            response = self.client.post("/api/chat/ai/", {"messages": [{"role": "user", "content": "hi"}]}, format="json")
+        self.assertEqual(response.data["reply"], "Hi")
+        self.assertIn("api.groq.com", captured["url"])
+        self.assertEqual(captured["headers"]["authorization"], "Bearer gsk_x")
         self.assertEqual(captured["body"]["messages"][0]["role"], "system")
+
+    @override_settings(MHTALK_AI_API_KEY="AQ.bad", MHTALK_AI_PROVIDER="gemini")
+    def test_rejected_key_message(self):
+        import io
+        import urllib.error
+
+        def fake(request, timeout=None):
+            raise urllib.error.HTTPError(
+                request.full_url, 401, "Unauthorized", {}, io.BytesIO(b'{"error": {"message": "API key not valid."}}')
+            )
+
+        with mock.patch("apps.chat.assistant.urllib.request.urlopen", fake):
+            response = self.client.post("/api/chat/ai/", {"messages": [{"role": "user", "content": "hi"}]}, format="json")
+        self.assertEqual(response.status_code, 502)
+        self.assertIn("rejected", response.data["detail"])
 
     @override_settings(MHTALK_AI_API_KEY="gsk_x", MHTALK_AI_PROVIDER="groq")
     def test_status_reports_the_provider(self):

@@ -402,7 +402,25 @@
   gap: 10px;
   width: 300px;
   max-width: 100%;
+  min-width: 0;
   padding: 4px 4px 2px 2px;
+  container-type: inline-size;
+}
+/* Narrow chat column (side panel open, small window): drop the extras
+   instead of letting the waveform spill out of the bubble. */
+@container (max-width: 250px) {
+  .audio__rate {
+    display: none;
+  }
+  .audio {
+    gap: 6px;
+  }
+}
+@container (max-width: 200px) {
+  .audio__avatar,
+  .audio__file-icon {
+    display: none;
+  }
 }
 .audio__avatar {
   position: relative;
@@ -470,11 +488,15 @@
   align-items: center;
   gap: 2px;
   height: 30px;
+  min-width: 0;
+  overflow: clip;
+  overflow-clip-margin: 8px;
   cursor: pointer;
+  touch-action: none;
 }
 .audio__wave span:not(.audio__knob) {
   flex: 1;
-  min-width: 2px;
+  min-width: 1px;
   max-width: 3px;
   border-radius: 2px;
   background: var(--audio-wave);

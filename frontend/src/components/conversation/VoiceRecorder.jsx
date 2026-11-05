@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Mic, Pause, Send, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { ChevronLeft, ChevronUp, Lock, Mic, Pause, Send, Trash2 } from "lucide-react";
 import { duration as formatDuration } from "../../utils/format";
 import { toast } from "../../services/toast";
 import AudioPlayer from "../messages/AudioPlayer";
@@ -13,12 +13,18 @@ function pickMimeType() {
   return candidates.find((type) => MediaRecorder.isTypeSupported?.(type)) || "";
 }
 
+const MIN_HOLD_MS = 700; // shorter holds are discarded, like WhatsApp
+
 /**
  * Voice note recorder (MediaRecorder), laid out like WhatsApp: record, pause
  * to listen back to what's recorded so far, resume with the mic, delete or
  * send, optionally as "view once". Collects waveform peaks for the bubble.
+ *
+ * Press-and-hold mode (`hold`): the Composer tracks the finger/mouse and
+ * calls ref.current.release() (send) or .cancel(); sliding up locks
+ * the recording, which then shows the full recorder.
  */
-export default function VoiceRecorder({ onCancel, onSend }) {
+export default function VoiceRecorder({ onCancel, onSend, hold = false, gesture = null, ref = null }) {
   const [phase, setPhase] = useState("starting"); // starting | recording | paused | preview (10-minute limit reached)
   const [viewOnce, setViewOnce] = useState(false);
   const [seconds, setSeconds] = useState(0);
@@ -32,6 +38,7 @@ export default function VoiceRecorder({ onCancel, onSend }) {
   const rafRef = useRef(null);
   const timerRef = useRef(null);
   const discardRef = useRef(false);
+  const startedAtRef = useRef(0);
 
   const cleanup = useCallback(() => {
     window.cancelAnimationFrame(rafRef.current);
@@ -76,6 +83,7 @@ export default function VoiceRecorder({ onCancel, onSend }) {
           setPhase("preview");
         };
         recorder.start(250);
+        startedAtRef.current = performance.now();
         setPhase("recording");
 
         // Live level meter + waveform peaks.
@@ -177,6 +185,41 @@ export default function VoiceRecorder({ onCancel, onSend }) {
     );
     discardRef.current = true;
     recorder.stop();
+  }
+
+  // Finger/mouse released while holding: send, unless it was too short.
+  function release() {
+    const recorder = recorderRef.current;
+    const heldFor = startedAtRef.current ? performance.now() - startedAtRef.current : 0;
+    if (!recorder || recorder.state === "inactive" || heldFor < MIN_HOLD_MS) {
+      discard();
+      toast("Hold to record, release to send");
+      return;
+    }
+    send();
+  }
+
+  useImperativeHandle(ref, () => ({ release, cancel: discard }));
+
+  if (hold) {
+    const dx = gesture?.dx || 0;
+    const dy = gesture?.dy || 0;
+    return (
+      <div className="recorder recorder--hold" role="group" aria-label="Recording voice message. Release to send, slide left to cancel, slide up to lock.">
+        <span className="recorder__dot" />
+        <span className="recorder__time">{formatDuration(seconds)}</span>
+        <span className="recorder__slide" style={{ transform: `translateX(${dx * 0.6}px)`, opacity: Math.max(0.15, 1 + dx / 130) }}>
+          <ChevronLeft size={18} /> Slide to cancel
+        </span>
+        <span className="recorder__lock" style={{ transform: `translateY(${Math.max(dy, -70) * 0.6}px)` }} aria-hidden>
+          <Lock size={16} />
+          <ChevronUp size={16} />
+        </span>
+        <span className="recorder__holdmic" aria-hidden>
+          <Mic size={24} />
+        </span>
+      </div>
+    );
   }
 
   return (
