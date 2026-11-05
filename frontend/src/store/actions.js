@@ -346,11 +346,12 @@ function fail(roomId, clientId, error) {
  * ``linkPreview`` is the composer's preview card (``false`` when the user
  * removed it, so the server stores none).
  */
-export async function sendText(roomId, text, replyTo, { mentions = [], linkPreview } = {}) {
+export async function sendText(roomId, text, replyTo, { mentions = [], linkPreview, status = null } = {}) {
   const content = text.trim();
   if (!content) return;
   const draft = optimistic(roomId, {
     content,
+    status_ref: status?.snapshot || null,
     mentions,
     link_preview: linkPreview || null,
     reply_to: replyTo ? { id: replyTo.id, content: replyTo.content, sender_id: replyTo.sender?.id, message_type: replyTo.message_type, is_view_once: replyTo.is_view_once } : null,
@@ -364,6 +365,7 @@ export async function sendText(roomId, text, replyTo, { mentions = [], linkPrevi
       client_message_id: draft.client_message_id,
       mentions,
       link_preview: linkPreview === false ? false : undefined,
+      status_id: status?.id,
     });
     settle(roomId, draft.client_message_id, saved);
   } catch (error) {
@@ -379,22 +381,23 @@ export function messageTypeForFile(file) {
 }
 
 /** A GIF from the GIF tab (GIPHY): sent as a small JSON card, played from GIPHY's CDN. */
-export function sendGif(roomId, gif, replyTo) {
+export function sendGif(roomId, gif, replyTo, { status = null } = {}) {
   const payload = { kind: "gif", mp4: gif.mp4, still: gif.still || "", width: gif.width || null, height: gif.height || null, title: gif.title || "" };
-  return sendText(roomId, GIF_PREFIX + JSON.stringify(payload), replyTo);
+  return sendText(roomId, GIF_PREFIX + JSON.stringify(payload), replyTo, { status, linkPreview: false });
 }
 
 /** A sticker: a small transparent image shown without a bubble. */
-export function sendSticker(roomId, file, replyTo) {
-  return sendFile(roomId, file, { messageType: "STICKER", replyTo });
+export function sendSticker(roomId, file, replyTo, { status = null } = {}) {
+  return sendFile(roomId, file, { messageType: "STICKER", replyTo, status });
 }
 
 /** Upload one file as its own message (WhatsApp sends each media separately). */
-export async function sendFile(roomId, file, { caption = "", replyTo, viewOnce = false, mentions = [], messageType = null } = {}) {
+export async function sendFile(roomId, file, { caption = "", replyTo, viewOnce = false, mentions = [], messageType = null, status = null } = {}) {
   const previewUrl = URL.createObjectURL(file);
   const type = messageType || messageTypeForFile(file);
   const draft = optimistic(roomId, {
     message_type: type,
+    status_ref: status?.snapshot || null,
     content: caption,
     is_view_once: viewOnce,
     view_once_opened_by: [],
@@ -414,6 +417,7 @@ export async function sendFile(roomId, file, { caption = "", replyTo, viewOnce =
         client_message_id: draft.client_message_id,
         view_once: viewOnce,
         mentions,
+        status_id: status?.id,
       },
       (event) => {
         if (!event.total) return;
@@ -427,7 +431,7 @@ export async function sendFile(roomId, file, { caption = "", replyTo, viewOnce =
   }
 }
 
-export async function sendVoice(roomId, blob, seconds, waveform, viewOnce = false) {
+export async function sendVoice(roomId, blob, seconds, waveform, viewOnce = false, { status = null } = {}) {
   const extension = blob.type.includes("ogg") ? "ogg" : blob.type.includes("mp4") ? "m4a" : "webm";
   const file = new File([blob], `voice-${Date.now()}.${extension}`, { type: blob.type || "audio/webm" });
   const previewUrl = URL.createObjectURL(blob);
@@ -435,10 +439,11 @@ export async function sendVoice(roomId, blob, seconds, waveform, viewOnce = fals
     message_type: "VOICE",
     voice_note: { audio: viewOnce ? null : previewUrl, duration: seconds, waveform },
     is_view_once: viewOnce,
+    status_ref: status?.snapshot || null,
     _retry: { kind: "voice", blob, seconds, waveform, viewOnce },
   });
   try {
-    const saved = await messageApi.voice({ room: roomId, audio: file, duration: Math.max(1, Math.round(seconds)), waveform, viewOnce });
+    const saved = await messageApi.voice({ room: roomId, audio: file, duration: Math.max(1, Math.round(seconds)), waveform, viewOnce, statusId: status?.id });
     // The voice endpoint has no client id; replace the draft explicitly.
     dispatch({ type: "messages/remove", roomId, ids: [draft.client_message_id] });
     settle(roomId, draft.client_message_id, saved);
@@ -512,14 +517,15 @@ export async function votePoll(roomId, message, optionId) {
 }
 
 /** Share a location: ``{ latitude, longitude, accuracy?, name?, address? }``. */
-export async function sendLocation(roomId, location) {
+export async function sendLocation(roomId, location, { status = null } = {}) {
   const draft = optimistic(roomId, {
     message_type: "LOCATION",
+    status_ref: status?.snapshot || null,
     content: { address: "", ...location },
     _retry: { kind: "location", location },
   });
   try {
-    const saved = await messageApi.send({ room: roomId, message_type: "LOCATION", content: location, client_message_id: draft.client_message_id });
+    const saved = await messageApi.send({ room: roomId, message_type: "LOCATION", content: location, client_message_id: draft.client_message_id, status_id: status?.id });
     settle(roomId, draft.client_message_id, saved);
     return true;
   } catch (error) {

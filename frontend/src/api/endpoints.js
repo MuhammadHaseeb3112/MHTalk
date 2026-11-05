@@ -41,6 +41,7 @@ export const contactsApi = {
 };
 
 export const chatApi = {
+  recentStickers: () => api.get("chat/stickers/recent/").then((r) => r.data.results || []),
   gifs: (q = "", offset = 0) => api.get("chat/gifs/", { params: { q, offset } }).then((r) => r.data),
   rooms: () => api.get("chat/rooms/", { params: { archived: "all" } }).then((r) => asList(r.data)),
   roomInfo: (roomId) => api.get(`chat/rooms/${roomId}/info/`).then((r) => r.data),
@@ -83,11 +84,11 @@ export const chatApi = {
 export const messageApi = {
   list: (roomId, { before, limit = 60 } = {}) =>
     api.get(`chat/rooms/${roomId}/messages/`, { params: { before, limit } }).then((r) => asList(r.data)),
-  send: ({ room, content, reply_to, client_message_id, message_type = "TEXT", mentions, link_preview }) =>
+  send: ({ room, content, reply_to, client_message_id, message_type = "TEXT", mentions, link_preview, status_id }) =>
     api
-      .post("chat/messages/", { room, content, reply_to, client_message_id, message_type, mentions: mentions?.length ? mentions : undefined, link_preview })
+      .post("chat/messages/", { room, content, reply_to, client_message_id, message_type, mentions: mentions?.length ? mentions : undefined, link_preview, status_id })
       .then((r) => r.data.data),
-  upload: ({ room, file, message_type, content, reply_to, client_message_id, view_once, mentions }, onUploadProgress) =>
+  upload: ({ room, file, message_type, content, reply_to, client_message_id, view_once, mentions, status_id }, onUploadProgress) =>
     api
       .post(
         "chat/messages/upload/",
@@ -100,6 +101,7 @@ export const messageApi = {
           client_message_id,
           view_once: view_once ? "true" : undefined,
           mentions: mentions?.length ? mentions.join(",") : undefined,
+          status_id,
         }),
         { onUploadProgress },
       )
@@ -107,9 +109,9 @@ export const messageApi = {
   vote: (id, optionIds) => api.post(`chat/messages/${id}/poll/vote/`, { option_ids: optionIds }).then((r) => r.data),
   /** View once media is only served once, with the JWT: fetch it as a blob. */
   openViewOnce: (id) => api.get(`chat/messages/${id}/view-once/`, { responseType: "blob" }).then((r) => r.data),
-  voice: ({ room, audio, duration, waveform, viewOnce }, onUploadProgress) =>
+  voice: ({ room, audio, duration, waveform, viewOnce, statusId }, onUploadProgress) =>
     api
-      .post("chat/messages/voice/", form({ room, audio, duration, waveform: JSON.stringify(waveform || []), ...(viewOnce ? { view_once: "true" } : {}) }), {
+      .post("chat/messages/voice/", form({ room, audio, duration, waveform: JSON.stringify(waveform || []), ...(viewOnce ? { view_once: "true" } : {}), ...(statusId ? { status_id: statusId } : {}) }), {
         onUploadProgress,
       })
       .then((r) => r.data),

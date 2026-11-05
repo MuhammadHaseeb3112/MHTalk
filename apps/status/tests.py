@@ -180,3 +180,55 @@ class StatusReactionMessageTests(TestCase):
         for text in ("hi", "ok 👍", ""):
             response = self.client.post(f"/api/status/{self.status.id}/react/", {"emoji": text}, format="json")
             self.assertEqual(response.status_code, 400, text)
+
+
+class StatusReplyAnyMessageTests(TestCase):
+    """Any message type can reply to a status (card above it, like WhatsApp)."""
+
+    def setUp(self):
+        from apps.chat.choices import RoomType
+        from apps.chat.models import ChatRoom, Participant
+
+        self.owner = User.objects.create_user(phone_number="+923000000401", password="StrongPass123!")
+        self.viewer = User.objects.create_user(phone_number="+923000000402", password="StrongPass123!")
+        self.stranger = User.objects.create_user(phone_number="+923000000403", password="StrongPass123!")
+        Contact.objects.create(owner=self.owner, contact_user=self.viewer)
+        Contact.objects.create(owner=self.viewer, contact_user=self.owner)
+        self.status = Status.objects.create(
+            user=self.owner, status_type=StatusType.TEXT, content="Hello",
+            visibility=StatusVisibility.EVERYONE, expires_at=timezone.now() + timedelta(hours=24),
+        )
+        self.room = ChatRoom.objects.create(room_type=RoomType.PRIVATE, created_by=self.viewer)
+        Participant.objects.create(room=self.room, user=self.viewer)
+        Participant.objects.create(room=self.room, user=self.owner)
+        self.client = APIClient()
+        self.client.force_authenticate(self.viewer)
+
+    def test_text_location_and_voice_carry_the_status_card(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        r = self.client.post("/api/chat/messages/", {"room": self.room.id, "content": "nice", "message_type": "TEXT", "status_id": self.status.id}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(r.data["data"]["status_ref"]["status_id"], self.status.id)
+        self.assertEqual(r.data["data"]["status_ref"]["owner_id"], self.owner.id)
+        audio = SimpleUploadedFile("v.webm", b"\x1aE\xdf\xa3" + b"0" * 200, content_type="audio/webm")
+        r = self.client.post("/api/chat/messages/voice/", {"room": self.room.id, "audio": audio, "duration": "3", "status_id": self.status.id}, format="multipart")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(r.data["status_ref"]["status_text"], "Hello")
+
+    def test_rejected_for_other_rooms_and_unknown_status(self):
+        from apps.chat.choices import RoomType
+        from apps.chat.models import ChatRoom, Participant
+
+        other = ChatRoom.objects.create(room_type=RoomType.PRIVATE, created_by=self.viewer)
+        Participant.objects.create(room=other, user=self.viewer)
+        Participant.objects.create(room=other, user=self.stranger)
+        r = self.client.post("/api/chat/messages/", {"room": other.id, "content": "x", "message_type": "TEXT", "status_id": self.status.id}, format="json")
+        self.assertEqual(r.status_code, 400)
+        r = self.client.post("/api/chat/messages/", {"room": self.room.id, "content": "x", "message_type": "TEXT", "status_id": 999999}, format="json")
+        self.assertEqual(r.status_code, 400)
+
+    def test_recent_stickers_endpoint(self):
+        r = self.client.get("/api/chat/stickers/recent/")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.data["results"], [])

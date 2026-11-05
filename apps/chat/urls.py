@@ -1,7 +1,7 @@
 from django.urls import path
 
 from .assistant import AssistantAPIView
-from .gifs import GifSearchAPIView
+from .gifs import GifSearchAPIView, RecentStickersAPIView
 from .group_views import (
     GroupInviteLinkAPIView,
     GroupPermissionsAPIView,
@@ -139,6 +139,7 @@ urlpatterns = [
         name="assistant",
     ),
     path("gifs/", GifSearchAPIView.as_view(), name="gif-search"),
+    path("stickers/recent/", RecentStickersAPIView.as_view(), name="recent-stickers"),
     path(
         "rooms/<int:pk>/info/",
         ChatRoomInfoAPIView.as_view(),

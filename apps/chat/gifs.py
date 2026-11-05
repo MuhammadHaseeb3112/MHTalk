@@ -80,3 +80,39 @@ class GifSearchAPIView(APIView):
         data = {"results": results}
         cache.set(cache_key, data, 600)
         return Response(data)
+
+
+class RecentStickersAPIView(APIView):
+    """
+    Stickers sent or received in your chats (newest first), so the Sticker
+    tab shows the same stickers on every device, like WhatsApp's "Recent".
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(summary="Recent stickers", tags=["Chat"])
+    def get(self, request):
+        from .choices import MessageType
+        from .models import Attachment
+
+        rows = (
+            Attachment.objects.filter(
+                message__message_type=MessageType.STICKER,
+                message__is_deleted=False,
+                message__room__participants__user=request.user,
+            )
+            .exclude(message__deleted_for_users__user=request.user)
+            .order_by("-message__created_at")
+            .values_list("file", "file_size", "file_name")[:200]
+        )
+        seen = set()
+        items = []
+        for file, size, name in rows:
+            key = (name, size)
+            if not file or key in seen:
+                continue
+            seen.add(key)
+            items.append(file if file.startswith("http") else settings.MEDIA_URL + file)
+            if len(items) >= 40:
+                break
+        return Response({"results": items})

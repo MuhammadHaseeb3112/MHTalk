@@ -511,3 +511,22 @@
   color: var(--text-muted);
   font-size: var(--fs-xs) !important;
 }
+
+/* Phones: all selection actions fit (reply, star, copy, forward, delete, more) */
+@media (max-width: 560px) {
+  .selection-bar {
+    gap: 4px;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+  .selection-bar__count {
+    white-space: nowrap;
+  }
+  .selection-bar__actions {
+    gap: 0;
+  }
+  .selection-bar__actions .icon-btn {
+    width: 38px;
+    height: 38px;
+  }
+}

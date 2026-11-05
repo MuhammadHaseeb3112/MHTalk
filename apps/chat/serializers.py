@@ -572,6 +572,7 @@ class MessageSerializer(serializers.ModelSerializer):
             "is_view_once",
             "view_once_opened_by",
             "link_preview",
+            "status_ref",
             "mentions",
             "poll",
             "created_at",
@@ -581,6 +582,7 @@ class MessageSerializer(serializers.ModelSerializer):
         read_only_fields = (
             "id",
             "sender",
+            "status_ref",
             "attachments",
             "is_edited",
             "is_deleted",

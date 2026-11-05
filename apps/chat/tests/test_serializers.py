@@ -196,6 +196,7 @@ class MessageSerializerTest(TestCase):
                 "is_view_once",
                 "view_once_opened_by",
                 "link_preview",
+                "status_ref",
                 "mentions",
                 "poll",
                 "room_id",

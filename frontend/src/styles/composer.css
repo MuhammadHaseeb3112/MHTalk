@@ -455,3 +455,10 @@
   color: var(--text-muted);
   font-size: var(--fs-sm);
 }
+.sticker-grid__title {
+  grid-column: 1 / -1;
+  margin: 6px 4px 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}

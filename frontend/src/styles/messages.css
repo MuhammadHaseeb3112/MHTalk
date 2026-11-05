@@ -891,3 +891,9 @@ mark.search-hit {
   padding: 1px 6px;
   border-radius: 10px;
 }
+
+/* Any message replying to a status: the status card on top */
+.status-reaction--ref {
+  margin: -1px -2px 6px;
+  min-width: 220px;
+}

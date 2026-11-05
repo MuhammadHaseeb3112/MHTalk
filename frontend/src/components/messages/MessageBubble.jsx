@@ -302,11 +302,10 @@ function CallCard({ event, myId, onCall }) {
   );
 }
 
-/** Reaction or reply to a status: WhatsApp's "Name · Status" card + the reply. */
-function StatusReactionCard({ payload, onOpen, ownerName }) {
+/** WhatsApp's "Name · Status" card (with a thumbnail of the status). */
+function StatusPreview({ payload, ownerName, onOpen }) {
   const media = payload.status_media ? mediaUrl(payload.status_media) : "";
   const type = payload.status_type;
-  const emojiReply = payload.emoji || (payload.text && emojiOnly(payload.text)) || "";
   let thumb;
   if (media && type === "IMAGE") thumb = <img src={media} alt="" />;
   else if (media && type === "VIDEO") thumb = <video src={`${media}#t=0.5`} preload="metadata" muted playsInline />;
@@ -317,26 +316,34 @@ function StatusReactionCard({ payload, onOpen, ownerName }) {
       </span>
     );
   return (
-    <div className="status-reaction is-clickable">
-      <div
-        className="status-reaction__preview"
-        role="button"
-        tabIndex={0}
-        title="View status"
-        onClick={(event) => {
-          event.stopPropagation();
-          onOpen();
-        }}
-        onKeyDown={(event) => event.key === "Enter" && onOpen()}
-      >
-        <span className="status-reaction__who">
-          <strong>{ownerName} · Status</strong>
-          <span className="status-reaction__type">
-            {type === "VIDEO" ? <><VideoIcon size={14} /> Video</> : type === "IMAGE" ? <><ImageIcon size={14} /> Photo</> : payload.status_text || "Status"}
-          </span>
+    <div
+      className="status-reaction__preview"
+      role="button"
+      tabIndex={0}
+      title="View status"
+      onClick={(event) => {
+        event.stopPropagation();
+        onOpen();
+      }}
+      onKeyDown={(event) => event.key === "Enter" && onOpen()}
+    >
+      <span className="status-reaction__who">
+        <strong>{ownerName} · Status</strong>
+        <span className="status-reaction__type">
+          {type === "VIDEO" ? <><VideoIcon size={14} /> Video</> : type === "IMAGE" ? <><ImageIcon size={14} /> Photo</> : payload.status_text || "Status"}
         </span>
-        <span className="status-reaction__thumb">{thumb}</span>
-      </div>
+      </span>
+      <span className="status-reaction__thumb">{thumb}</span>
+    </div>
+  );
+}
+
+/** Reaction or text reply to a status: the status card + the emoji / text. */
+function StatusReactionCard({ payload, onOpen, ownerName }) {
+  const emojiReply = payload.emoji || (payload.text && emojiOnly(payload.text)) || "";
+  return (
+    <div className="status-reaction is-clickable">
+      <StatusPreview payload={payload} ownerName={ownerName} onOpen={onOpen} />
       {emojiReply ? <span className="status-reaction__emoji">{emojiReply}</span> : <span className="status-reaction__reply">{payload.text}</span>}
     </div>
   );
@@ -385,10 +392,12 @@ function MessageBubble({
     if (pressRef.current) window.clearTimeout(pressRef.current.timer);
     pressRef.current = null;
   };
+  // Touch screens, like WhatsApp: press and hold selects the message and
+  // shows the reaction bar; then tapping other messages adds them.
   const startPress = (event) => {
     if (selectMode || pending || event.touches.length !== 1) return;
     const touch = event.touches[0];
-    const point = { clientX: touch.clientX, clientY: touch.clientY, type: "longpress" };
+    const anchorEl = event.currentTarget;
     cancelPress();
     pressRef.current = {
       x: touch.clientX,
@@ -396,7 +405,7 @@ function MessageBubble({
       timer: window.setTimeout(() => {
         pressRef.current = null;
         navigator.vibrate?.(15);
-        onAction("menu", message, point);
+        onAction("longPress", message, { anchorEl });
       }, 450),
     };
   };
@@ -410,8 +419,9 @@ function MessageBubble({
   const first = attachments[0];
   const special = kind === "call" || kind === "status_reaction" || kind === "gif" ? parseSpecial(message.content) : null;
   const caption = kind === "image" || kind === "video" ? message.content : "";
-  const emojiOnly = (kind === "text" && message.content && message.content.length <= 24 && EMOJI_ONLY.test(message.content)) || kind === "sticker";
-  const isMedia = ((kind === "image" || kind === "video") && !caption) || kind === "gif";
+  const statusRef = message.status_ref && kind !== "status_reaction" ? message.status_ref : null;
+  const emojiOnly = !statusRef && ((kind === "text" && message.content && message.content.length <= 24 && EMOJI_ONLY.test(message.content)) || kind === "sticker");
+  const isMedia = !statusRef && (((kind === "image" || kind === "video") && !caption) || kind === "gif");
   const pending = Boolean(message._pending);
 
   const act = (type) => (event) => onAction(type, message, event);
@@ -559,6 +569,15 @@ function MessageBubble({
             </span>
           ) : null}
           {message.reply_to ? <ReplyQuote reply={message.reply_to} nameOf={nameOf} colorOf={colorOf} onJump={(id) => onAction("jump", message, { id })} myId={myId} /> : null}
+          {statusRef ? (
+            <div className="status-reaction status-reaction--ref">
+              <StatusPreview
+                payload={statusRef}
+                ownerName={Number(statusRef.owner_id) === Number(myId) ? "You" : nameOf(statusRef.owner_id)}
+                onOpen={() => onAction("openStatus", message, statusRef)}
+              />
+            </div>
+          ) : null}
           {body}
           {caption ? (
             <span className="bubble__text bubble__caption">

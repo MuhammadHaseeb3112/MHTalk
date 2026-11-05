@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
-import { errorMessage } from "../../api/client";
+import { errorMessage, mediaUrl } from "../../api/client";
 import { chatApi } from "../../api/endpoints";
 import { useDebouncedValue } from "../../hooks";
 import { toast } from "../../services/toast";
@@ -51,8 +51,35 @@ export function GifPanel({ onPick }) {
 /** Sticker tab: your stickers (saved in this browser) + "Create" from a photo. */
 export function StickerPanel({ onPick }) {
   const [items, setItems] = useState(savedStickers);
+  const [recent, setRecent] = useState([]);
   const [busy, setBusy] = useState(false);
   const inputRef = useRef(null);
+  // Stickers from your chats (on every device), like WhatsApp's "Recent".
+  useEffect(() => {
+    let cancelled = false;
+    chatApi
+      .recentStickers()
+      .then((urls) => !cancelled && setRecent(urls))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  async function sendRecent(url) {
+    setBusy(true);
+    try {
+      const blob = await fetch(mediaUrl(url)).then((response) => {
+        if (!response.ok) throw new Error("download failed");
+        return response.blob();
+      });
+      const type = blob.type || "image/webp";
+      onPick(new File([blob], url.split("/").pop() || "sticker.webp", { type }));
+    } catch {
+      toast.error("Couldn't send that sticker.");
+    } finally {
+      setBusy(false);
+    }
+  }
   async function create(event) {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -93,7 +120,15 @@ export function StickerPanel({ onPick }) {
           </button>
         </span>
       ))}
-      {!items.length ? <p className="sticker-grid__hint">Tap Create to turn any photo into a sticker.</p> : null}
+      {recent.length ? <h4 className="sticker-grid__title">Recent</h4> : null}
+      {recent.map((url) => (
+        <span key={url} className="sticker-grid__item">
+          <button type="button" onClick={() => sendRecent(url)} aria-label="Send sticker" disabled={busy}>
+            <img src={mediaUrl(url)} alt="" draggable={false} loading="lazy" />
+          </button>
+        </span>
+      ))}
+      {!items.length && !recent.length ? <p className="sticker-grid__hint">Tap Create to turn any photo into a sticker.</p> : null}
       <input ref={inputRef} type="file" accept="image/*" hidden onChange={create} />
     </div>
   );

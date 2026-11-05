@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight, Eye, MoreVertical, Pause, Play, Send, Smile, Trash2, Volume2, VolumeX, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, MoreVertical, Pause, Play, Trash2, Volume2, VolumeX, X } from "lucide-react";
 import { errorMessage, mediaUrl } from "../../api/client";
 import { statusApi } from "../../api/endpoints";
 import { loadStatus } from "../../store/actions";
@@ -10,8 +10,7 @@ import { detailTime, listTime } from "../../utils/format";
 import { contactsByUser, displayUserName } from "../../utils/messages";
 import { Avatar, IconButton, MenuButton, Spinner } from "../common/ui";
 import { confirmAction } from "../common/dialogs";
-import EmojiPicker from "../conversation/EmojiPicker";
-import { emojiOnly, rememberEmoji } from "../../utils/emoji";
+import StatusReplyBar from "./StatusReplyBar";
 
 const IMAGE_MS = 6000;
 
@@ -90,9 +89,6 @@ export default function StatusViewer({ groups, startGroup = 0, startStatusId, on
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
   const [muted, setMuted] = useState(false);
-  const [reply, setReply] = useState("");
-  const [emojiOpen, setEmojiOpen] = useState(false);
-  const emojiBtnRef = useRef(null);
   const [viewers, setViewers] = useState(null);
   const videoRef = useRef(null);
   const status = group?.statuses[index];
@@ -164,40 +160,6 @@ export default function StatusViewer({ groups, startGroup = 0, startStatusId, on
   }, [next, previous, onClose]);
 
   if (!group || !status) return null;
-
-  async function react(emoji) {
-    try {
-      await statusApi.react(status.id, emoji);
-      toast.success(`Reacted ${emoji}`);
-      setPaused(false);
-    } catch (error) {
-      toast.error(errorMessage(error));
-    }
-  }
-
-  async function sendReply(event) {
-    event.preventDefault();
-    const value = reply.trim();
-    if (!value) return;
-    setReply("");
-    setEmojiOpen(false);
-    // Only emoji (from the phone keyboard or the picker): it's a reaction,
-    // shown in the chat as "Reacted 😂 to a status", like WhatsApp.
-    const emoji = emojiOnly(value);
-    if (emoji) {
-      rememberEmoji(emoji);
-      await react(emoji);
-      setPaused(false);
-      return;
-    }
-    try {
-      await statusApi.reply(status.id, value);
-      toast.success("Reply sent");
-      setPaused(false);
-    } catch (error) {
-      toast.error(errorMessage(error));
-    }
-  }
 
   function remove() {
     setPaused(true);
@@ -292,34 +254,7 @@ export default function StatusViewer({ groups, startGroup = 0, startStatusId, on
               <Eye size={18} /> {viewsCount} view{viewsCount === 1 ? "" : "s"}
             </button>
           ) : (
-            <>
-              {emojiOpen ? (
-                <EmojiPicker
-                  className="emoji-picker--status"
-                  ignoreRefs={[emojiBtnRef]}
-                  onPick={(emoji) => setReply((value) => value + emoji)}
-                  onClose={() => setEmojiOpen(false)}
-                />
-              ) : null}
-              <form className="status-viewer__reply" onSubmit={sendReply}>
-                <button
-                  ref={emojiBtnRef}
-                  type="button"
-                  className="icon-btn status-viewer__emoji"
-                  aria-label="Emoji"
-                  onClick={() => {
-                    setPaused(true);
-                    setEmojiOpen((value) => !value);
-                  }}
-                >
-                  <Smile size={24} />
-                </button>
-                <input value={reply} onChange={(event) => setReply(event.target.value)} onFocus={() => setPaused(true)} onBlur={() => setPaused(false)} placeholder="Reply…" maxLength={1000} />
-                <button type="submit" className="send-btn" aria-label="Send reply" disabled={!reply.trim()}>
-                  <Send size={18} />
-                </button>
-              </form>
-            </>
+            <StatusReplyBar key={status.id} status={status} owner={owner} onPause={() => setPaused(true)} onResume={() => setPaused(false)} />
           )}
         </footer>
       </div>

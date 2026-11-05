@@ -796,7 +796,12 @@ class SendMessageAPIView(generics.CreateAPIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        from apps.status.replies import status_ref_for
+
+        status_ref = status_ref_for(request, room)
         message = serializer.save()
+        if status_ref and not getattr(message, "_was_duplicate", False):
+            Message.objects.filter(pk=message.pk).update(status_ref=status_ref)
 
         if not getattr(message, "_was_duplicate", False):
             if message.message_type == MessageType.TEXT:
@@ -885,7 +890,12 @@ class UploadMessageAPIView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        from apps.status.replies import status_ref_for
+
+        status_ref = status_ref_for(request, room)
         message = serializer.save()
+        if status_ref and not getattr(message, "_was_duplicate", False):
+            Message.objects.filter(pk=message.pk).update(status_ref=status_ref)
 
         if not getattr(message, "_was_duplicate", False):
             message = get_message_with_relations(message.id)
@@ -1038,6 +1048,9 @@ class UploadVoiceAPIView(APIView):
             waveform = []
         waveform = [max(1, min(100, int(value))) for value in waveform[:96] if str(value).lstrip("-").isdigit()]
         view_once = str(request.data.get("view_once", "")).lower() in ("1", "true", "yes", "on")
+        from apps.status.replies import status_ref_for
+
+        status_ref = status_ref_for(request, room)
 
         with transaction.atomic():
 
@@ -1047,6 +1060,7 @@ class UploadVoiceAPIView(APIView):
                 message_type=MessageType.VOICE,
                 content="",
                 is_view_once=view_once,
+                status_ref=status_ref,
             )
 
             VoiceNote.objects.create(

@@ -142,6 +142,10 @@ class Message(models.Model):
 
     # Link preview computed server-side once and shared by every recipient:
     # {"url", "title", "description", "site_name", "image"}.
+    # A reply to a status (photo, voice, GIF, sticker...): a snapshot of the
+    # status shown as a card above the message, like WhatsApp.
+    status_ref = models.JSONField(null=True, blank=True, default=None)
+
     link_preview = models.JSONField(
         null=True,
         blank=True,
