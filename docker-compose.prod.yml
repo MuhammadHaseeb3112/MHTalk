@@ -110,11 +110,26 @@ services:
     profiles: ["turn"]
     restart: unless-stopped
     network_mode: host
-    command: >-
-      -n --log-file=stdout --fingerprint --lt-cred-mech
-      --use-auth-secret --static-auth-secret=${TURN_SECRET}
-      --realm=${DOMAIN} --listening-port=3478
-      --min-port=49160 --max-port=49200 --no-cli --no-tlsv1 --no-tlsv1_1
+    environment:
+      TURN_SECRET: ${TURN_SECRET}
+      TURN_REALM: ${DOMAIN}
+      # Cloud VMs (Oracle, AWS, ...) sit behind NAT: "public-ip/private-ip"
+      # makes the relay advertise the public address. Empty = no NAT.
+      TURN_EXTERNAL_IP: ${TURN_EXTERNAL_IP:-}
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -- -n --log-file=stdout --fingerprint --lt-cred-mech \
+          --use-auth-secret --static-auth-secret="$$TURN_SECRET" \
+          --realm="$$TURN_REALM" --listening-port=3478 \
+          --min-port=49160 --max-port=49200 --no-cli
+        if [ -n "$$TURN_EXTERNAL_IP" ]; then
+          set -- "$$@" --external-ip="$$TURN_EXTERNAL_IP"
+          case "$$TURN_EXTERNAL_IP" in
+            */*) set -- "$$@" --relay-ip="$${TURN_EXTERNAL_IP#*/}" ;;
+          esac
+        fi
+        exec turnserver "$$@"
 
 volumes:
   postgres_data:

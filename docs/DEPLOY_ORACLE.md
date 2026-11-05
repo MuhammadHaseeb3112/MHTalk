@@ -116,7 +116,9 @@ nano .env.prod
 ```
 
 Fill in your domain everywhere (`DOMAIN`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`,
-`CORS_ALLOWED_ORIGINS`, `TURN_URLS`) and the generated secrets. Optional:
+`CORS_ALLOWED_ORIGINS`, `TURN_URLS`) and the generated secrets. Set
+`TURN_EXTERNAL_IP=<public IP>/<private IP>` so calls work through Oracle's NAT
+(the private IP is the first address printed by `hostname -I`). Optional:
 `MHTALK_AI_API_KEY` (free Gemini key) and the push-notification keys
 (Step 8). Save with **Ctrl+O**, **Enter**, **Ctrl+X**.
 
