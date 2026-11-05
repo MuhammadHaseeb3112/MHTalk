@@ -3,9 +3,12 @@ import { CallContext } from "./callContext";
 import { errorMessage } from "../../api/client";
 import { callApi } from "../../api/endpoints";
 import { ManagedSocket } from "../../services/realtime";
+import { showDesktopNotification } from "../../services/notify";
+import { loopSound, preloadSounds } from "../../services/sounds";
 import { toast } from "../../services/toast";
 import { loadCalls } from "../../store/actions";
 import { dispatch, getState } from "../../store/store";
+import { contactsByUser, displayUserName } from "../../utils/messages";
 import CallOverlay from "./CallOverlay";
 
 /**
@@ -60,40 +63,9 @@ function iceServers() {
   return iceCache.servers || fallbackIceServers();
 }
 
+// Incoming call: ringtone. Outgoing call: "ring-ring" until they answer.
 function createTone(kind) {
-  let context;
-  let timer;
-  const beep = () => {
-    try {
-      context = context || new (window.AudioContext || window.webkitAudioContext)();
-      const now = context.currentTime;
-      const freqs = kind === "incoming" ? [880, 660] : [440];
-      freqs.forEach((freq, index) => {
-        const osc = context.createOscillator();
-        const gain = context.createGain();
-        osc.frequency.value = freq;
-        gain.gain.setValueAtTime(0.0001, now + index * 0.25);
-        gain.gain.exponentialRampToValueAtTime(0.06, now + index * 0.25 + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + index * 0.25 + (kind === "incoming" ? 0.22 : 1));
-        osc.connect(gain).connect(context.destination);
-        osc.start(now + index * 0.25);
-        osc.stop(now + index * 0.25 + 1.05);
-      });
-    } catch {
-      /* audio not allowed yet */
-    }
-  };
-  return {
-    start() {
-      beep();
-      timer = window.setInterval(beep, kind === "incoming" ? 1600 : 3000);
-    },
-    stop() {
-      window.clearInterval(timer);
-      context?.close().catch(() => {});
-      context = null;
-    },
-  };
+  return loopSound(kind === "incoming" ? "ringtone" : "ringback");
 }
 
 const IDLE = { phase: "idle" };
@@ -130,6 +102,8 @@ export function CallProvider({ children }) {
   const toneRef = useRef(null);
   const handleSignalRef = useRef(null);
   const acceptRef = useRef(null); // latest accept(), for joinCall() from a banner
+
+  useEffect(() => preloadSounds(), []);
 
   const stopTone = useCallback(() => {
     toneRef.current?.stop();
@@ -802,6 +776,11 @@ export function CallProvider({ children }) {
           remoteCameraOff: type !== "video",
         });
         playTone("incoming");
+        // Tab in the background: a desktop notification too (if enabled in Settings).
+        const caller = group ? room?.name || "Group" : displayUserName(peerUser, contactsByUser(state.contacts));
+        showDesktopNotification(caller, `Incoming ${group ? "group " : ""}${type === "video" ? "video" : "voice"} call`, () => {
+          window.dispatchEvent(new CustomEvent("mhtalk:open-room", { detail: payload.room }));
+        });
         if (group) loadCalls();
       },
     });

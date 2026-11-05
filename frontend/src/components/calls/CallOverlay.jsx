@@ -97,7 +97,7 @@ function IncomingCard({ call, name, photo, subtitle, onAccept, onDecline, onDism
         <Avatar src={photo} name={name} size={48} group={call.group} />
         <div className="call-incoming__who">
           <strong>{name}</strong>
-          <span>{subtitle || (isVideo ? "Video call" : "Voice call")}</span>
+          <span>{subtitle || (isVideo ? "Incoming video call" : "Incoming voice call")}</span>
         </div>
         <button type="button" className="icon-btn" onClick={onDismiss} aria-label="Dismiss" title="Hide (keeps ringing for the caller)">
           <X size={20} />
@@ -224,7 +224,7 @@ export default function CallOverlay({
   const audio = call.group ? <GroupCallAudio remoteStreams={remoteStreams} /> : <audio ref={remoteAudioRef} autoPlay />;
 
   if (call.phase === "incoming") {
-    const subtitle = call.group ? `${callerName ? `${callerName} · ` : ""}Group ${call.type === "video" ? "video" : "voice"} call` : "";
+    const subtitle = call.group ? `${callerName ? `${callerName} · ` : ""}Incoming group ${call.type === "video" ? "video" : "voice"} call` : "";
     return (
       <>
         {audio}

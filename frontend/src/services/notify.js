@@ -3,6 +3,8 @@
  * notifications and the tab title badge. Preferences are per-browser.
  */
 
+import { playSound } from "./sounds";
+
 const PREFS_KEY = "mhtalk_notification_prefs";
 
 export function getNotificationPrefs() {
@@ -19,27 +21,9 @@ export function setNotificationPrefs(patch) {
   return next;
 }
 
-let audioContext = null;
 export function playIncomingSound() {
   if (!getNotificationPrefs().sound) return;
-  try {
-    audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
-    const now = audioContext.currentTime;
-    [880, 1320].forEach((frequency, index) => {
-      const oscillator = audioContext.createOscillator();
-      const gain = audioContext.createGain();
-      oscillator.type = "sine";
-      oscillator.frequency.value = frequency;
-      gain.gain.setValueAtTime(0.0001, now + index * 0.09);
-      gain.gain.exponentialRampToValueAtTime(0.08, now + index * 0.09 + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + index * 0.09 + 0.16);
-      oscillator.connect(gain).connect(audioContext.destination);
-      oscillator.start(now + index * 0.09);
-      oscillator.stop(now + index * 0.09 + 0.18);
-    });
-  } catch {
-    /* audio blocked until the user interacts with the page */
-  }
+  playSound("message");
 }
 
 export async function requestDesktopPermission() {

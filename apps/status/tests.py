@@ -132,3 +132,43 @@ class StatusFeatureAPITests(TestCase):
             for group in viewer_feed.data
         ))
 
+
+
+class StatusReactionMessageTests(TestCase):
+    """Each reaction to a status is its own chat message, like WhatsApp."""
+
+    def setUp(self):
+        self.owner = User.objects.create_user(phone_number="+923000000301", password="StrongPass123!")
+        self.viewer = User.objects.create_user(phone_number="+923000000302", password="StrongPass123!")
+        Contact.objects.create(owner=self.owner, contact_user=self.viewer)
+        Contact.objects.create(owner=self.viewer, contact_user=self.owner)
+        self.status = Status.objects.create(
+            user=self.owner,
+            status_type=StatusType.TEXT,
+            content="Hello",
+            visibility=StatusVisibility.EVERYONE,
+            expires_at=timezone.now() + timedelta(hours=24),
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(self.viewer)
+
+    def test_three_reactions_make_three_messages_and_status_keeps_latest(self):
+        from apps.chat.models import Message
+        from apps.status.models import StatusReaction
+
+        for emoji in ("👍", "😂", "❤️"):
+            response = self.client.post(f"/api/status/{self.status.id}/react/", {"emoji": emoji}, format="json")
+            self.assertEqual(response.status_code, 200)
+
+        messages = Message.objects.filter(sender=self.viewer, content__startswith="__MHTALK_STATUS_REACTION__:").order_by("id")
+        self.assertEqual(messages.count(), 3)
+        import json
+
+        prefix = "__MHTALK_STATUS_REACTION__:"
+        emojis = [json.loads(m.content[len(prefix):])["emoji"] for m in messages]
+        self.assertEqual(emojis, ["👍", "😂", "❤️"])
+        self.assertEqual(len({m.room_id for m in messages}), 1)
+
+        reaction = StatusReaction.objects.get(status=self.status, reactor=self.viewer)
+        self.assertEqual(reaction.emoji, "❤️")
+        self.assertEqual(reaction.chat_message_id, messages.last().id)

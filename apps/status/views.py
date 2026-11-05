@@ -1,4 +1,5 @@
 import json
+import uuid
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
@@ -444,13 +445,16 @@ class StatusReactionAPIView(APIView):
                 "status_created_at": status_obj.created_at.isoformat(),
             }
             content = "__MHTALK_STATUS_REACTION__:" + json.dumps(preview, separators=(",", ":"))
-            client_message_id = f"status-reaction-{status_obj.id}-{request.user.id}"
-            message, _created = Message.objects.update_or_create(
+            # Like WhatsApp, every reaction is its own chat message: reacting
+            # three times to a status shows three "Reacted … to a status" cards.
+            message = Message.objects.create(
                 room=room,
                 sender=request.user,
-                client_message_id=client_message_id,
-                defaults={"message_type": "TEXT", "content": content, "is_deleted": False},
+                client_message_id=f"status-reaction-{status_obj.id}-{request.user.id}-{uuid.uuid4().hex[:12]}",
+                message_type="TEXT",
+                content=content,
             )
+            # The status keeps the viewer's latest reaction (shown on the status).
             reaction, _created_reaction = StatusReaction.objects.update_or_create(
                 status=status_obj,
                 reactor=request.user,
