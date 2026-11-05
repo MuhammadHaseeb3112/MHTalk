@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bell, ChevronRight, CircleHelp, Download, Keyboard, KeyRound, Lock, LogOut, MessageSquareText, Palette, Search, Share, SquarePlus, UserX } from "lucide-react";
+import { Volume2, Bell, ChevronRight, CircleHelp, Download, Keyboard, KeyRound, Lock, LogOut, MessageSquareText, Palette, Search, Share, SquarePlus, UserX } from "lucide-react";
 import { useStore } from "../../store/store";
 import { loadBlocked, setBlocked } from "../../store/actions";
 import { getNotificationPrefs, requestDesktopPermission, setNotificationPrefs } from "../../services/notify";
 import { toast } from "../../services/toast";
+import { testSound } from "../../services/sounds";
 import { getInstallState, promptInstall, subscribeInstall } from "../../services/pwa";
 import { disableBackgroundPush, enableBackgroundPush, pushSupported, syncBackgroundPush } from "../../services/push";
 import { THEME_OPTIONS, getThemePref, setThemePref } from "../../services/theme";
@@ -216,6 +217,19 @@ export default function SettingsPanel() {
         <PanelHeader title="Notifications" onBack={() => setView("main")} variant="sub" />
         <div className="panel__scroll">
           <ToggleRow title="Sounds" subtitle="Play a sound for incoming messages" checked={prefs.sound} onChange={(value) => update({ sound: value })} />
+          <div className="settings-test-sound">
+            <button
+              type="button"
+              className="btn btn--outline"
+              onClick={async () => {
+                const ok = await testSound();
+                if (!ok) toast.error("This browser blocked the sound. Check that the tab / site isn't muted.");
+              }}
+            >
+              <Volume2 size={18} /> Test sound
+            </button>
+            <span>No sound? Right-click the MHTalk tab → <b>Unmute site</b>, and in the address bar → site settings → <b>Sound: Allow</b>.</span>
+          </div>
           <ToggleRow
             title="Desktop notifications"
             subtitle="Show notifications when MHTalk is in the background"

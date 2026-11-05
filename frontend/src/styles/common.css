@@ -539,3 +539,18 @@
   font-size: var(--fs-sm);
   line-height: 1.4;
 }
+
+.settings-test-sound {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 24px 16px;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.settings-test-sound .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}

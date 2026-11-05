@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, Eye, MoreVertical, Pause, Play, Send, Smile, Trash2, Volume2, VolumeX, X } from "lucide-react";
 import { errorMessage, mediaUrl } from "../../api/client";
 import { statusApi } from "../../api/endpoints";
-import { loadStatus, openChatWith, sendText } from "../../store/actions";
+import { loadStatus } from "../../store/actions";
 import { dispatch, getState, useStore } from "../../store/store";
 import { toast } from "../../services/toast";
 import { detailTime, listTime } from "../../utils/format";
@@ -191,9 +191,7 @@ export default function StatusViewer({ groups, startGroup = 0, startStatusId, on
       return;
     }
     try {
-      const roomId = await openChatWith(owner);
-      const summary = status.status_type === "TEXT" ? status.content : status.status_type === "VIDEO" ? "Video status" : "Photo status";
-      await sendText(roomId, `↩︎ Status: “${String(summary || "").slice(0, 60)}”\n${value}`);
+      await statusApi.reply(status.id, value);
       toast.success("Reply sent");
       setPaused(false);
     } catch (error) {

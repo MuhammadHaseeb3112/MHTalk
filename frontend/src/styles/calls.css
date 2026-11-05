@@ -762,3 +762,110 @@
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
   animation: pulse 1.4s ease-in-out infinite;
 }
+
+/* Camera switch on your own small preview */
+.call-pip__switch {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+}
+
+/* Minimized 1:1 call: floating, draggable window (WhatsApp style) */
+.call-float {
+  position: fixed;
+  right: 20px;
+  bottom: 90px;
+  z-index: 1350;
+  width: 200px;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #1b2328;
+  color: #fff;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.call-float:active {
+  cursor: grabbing;
+}
+.call-float .call-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.call-float__who {
+  position: absolute;
+  inset: 0 0 40%;
+  display: grid;
+  place-items: center;
+}
+.call-float__info {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 50px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 8px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+.call-float__info strong {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.call-float__info span {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+}
+.call-float__actions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+.call-float.has-video .call-float__info {
+  bottom: auto;
+  top: 6px;
+}
+.call-float .call-mini__btn {
+  width: 34px;
+  height: 34px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+}
+.call-float .call-mini__btn.is-off {
+  background: #fff;
+  color: #111;
+}
+.call-float .call-mini__btn--end {
+  background: #ea0038;
+}
+@media (max-width: 600px) {
+  .call-float {
+    width: 130px;
+    bottom: 80px;
+    right: 12px;
+  }
+  .call-float__info strong {
+    font-size: 12px;
+  }
+}

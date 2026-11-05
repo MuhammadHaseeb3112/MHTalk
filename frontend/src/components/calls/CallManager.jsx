@@ -857,8 +857,32 @@ export function CallProvider({ children }) {
     [openRoomSocket, playTone],
   );
 
+  const rejoin = useCallback(
+    async ({ auto = false } = {}) => {
+      const session = sessionRef.current;
+      if (!session?.pendingRejoin) return;
+      setCall((current) => ({ ...current, phase: "connecting", status: "Reconnecting…" }));
+      try {
+        await getMedia(session.type);
+        await roomSocketRef.current?.whenOpen();
+        sessionRef.current = { ...session, pendingRejoin: false };
+        await offerTo(session.targetId);
+      } catch (error) {
+        if (auto) {
+          // Needs a click first (camera/mic permission): show the Rejoin card.
+          setCall((current) => ({ ...current, phase: "rejoin", status: "Ongoing call" }));
+          return;
+        }
+        toast.error(error?.message || "Couldn't rejoin the call.");
+        cleanup();
+      }
+    },
+    [cleanup, getMedia, offerTo],
+  );
+
   // After a page reload: ring again for a call that is still ringing, or
-  // offer to rejoin an ongoing 1:1 call (the server waits ~30 s for us).
+  // reconnect an ongoing 1:1 call on its own (the server waits ~30 s for us).
+  // If the camera/mic can't be opened without a click, a "Rejoin" card shows.
   const restoredRef = useRef(false);
   useEffect(() => {
     if (restoredRef.current) return;
@@ -888,30 +912,17 @@ export function CallProvider({ children }) {
             callId: item.id,
             peerUser: getState().rooms[roomId]?.otherUser || other,
             status: `Ongoing ${type === "video" ? "video" : "voice"} call`,
+            connectedAt: item.answered_at ? Date.parse(item.answered_at) : null,
             muted: false,
             cameraOff: type !== "video",
             remoteCameraOff: type !== "video",
           });
+          rejoin({ auto: true });
           return;
         }
       })
       .catch(() => {});
-  }, [openRoomSocket, ringIncoming]);
-
-  const rejoin = useCallback(async () => {
-    const session = sessionRef.current;
-    if (!session?.pendingRejoin) return;
-    setCall((current) => ({ ...current, phase: "connecting", status: "Reconnecting…" }));
-    try {
-      await getMedia(session.type);
-      await roomSocketRef.current?.whenOpen();
-      sessionRef.current = { ...session, pendingRejoin: false };
-      await offerTo(session.targetId);
-    } catch (error) {
-      toast.error(error?.message || "Couldn't rejoin the call.");
-      cleanup();
-    }
-  }, [cleanup, getMedia, offerTo]);
+  }, [openRoomSocket, ringIncoming, rejoin]);
 
   // Incoming calls arrive on the per-user call inbox.
   useEffect(() => {
@@ -979,7 +990,7 @@ export function CallProvider({ children }) {
           onToggleMute={toggleMute}
           onToggleCamera={toggleCamera}
           onSwitchCamera={cameraCount > 1 ? switchCamera : null}
-          onRejoin={rejoin}
+          onRejoin={() => rejoin()}
           onToggleShare={toggleScreenShare}
           onReact={sendReaction}
           onToggleMinimized={toggleMinimized}

@@ -174,6 +174,8 @@ def _message_text(message):
         first = attachments[0]
         mime = (first.mime_type or "").lower()
         name = first.file_name or ""
+        if message.message_type == getattr(MessageType, "STICKER", "STICKER"):
+            return "🏷️ Sticker"
         if mime.startswith("image/") or message.message_type == MessageType.IMAGE:
             return f"📷 {content}" if content else "📷 Photo"
         if mime.startswith("video/") or message.message_type == MessageType.VIDEO:
@@ -277,7 +279,12 @@ def _send_message_pushes(message_id, hidden_user_ids):
         call_id = event.get("call_id")
     elif content.startswith(STATUS_REACTION_PREFIX):
         event = _special_payload(content)
-        text = f"Reacted {event.get('emoji', '')} to your status".replace("  ", " ")
+        if event.get("text"):
+            text = f"Replied to your status: {event['text']}"
+        else:
+            text = f"Reacted {event.get('emoji', '')} to your status".replace("  ", " ")
+    elif content.startswith("__MHTALK_GIF__:"):
+        text = "GIF"
     elif content.startswith("__MHTALK_"):
         # System notices / group events ("X added Y", disappearing timer...)
         # and any other internal payloads never notify.

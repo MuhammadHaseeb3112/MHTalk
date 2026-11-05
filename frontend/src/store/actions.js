@@ -1,7 +1,7 @@
 import { errorMessage } from "../api/client";
 import { callApi, chatApi, contactsApi, messageApi, statusApi } from "../api/endpoints";
 import { toast } from "../services/toast";
-import { newClientId, normalizeRoom, attachmentKind, isGroupEvent, isSystemMessage, myPollVotes } from "../utils/messages";
+import { GIF_PREFIX, newClientId, normalizeRoom, attachmentKind, isGroupEvent, isSystemMessage, myPollVotes } from "../utils/messages";
 import { dispatch, getState } from "./store";
 
 /**
@@ -378,25 +378,37 @@ export function messageTypeForFile(file) {
   return "DOCUMENT";
 }
 
+/** A GIF from the GIF tab (GIPHY): sent as a small JSON card, played from GIPHY's CDN. */
+export function sendGif(roomId, gif, replyTo) {
+  const payload = { kind: "gif", mp4: gif.mp4, still: gif.still || "", width: gif.width || null, height: gif.height || null, title: gif.title || "" };
+  return sendText(roomId, GIF_PREFIX + JSON.stringify(payload), replyTo);
+}
+
+/** A sticker: a small transparent image shown without a bubble. */
+export function sendSticker(roomId, file, replyTo) {
+  return sendFile(roomId, file, { messageType: "STICKER", replyTo });
+}
+
 /** Upload one file as its own message (WhatsApp sends each media separately). */
-export async function sendFile(roomId, file, { caption = "", replyTo, viewOnce = false, mentions = [] } = {}) {
+export async function sendFile(roomId, file, { caption = "", replyTo, viewOnce = false, mentions = [], messageType = null } = {}) {
   const previewUrl = URL.createObjectURL(file);
+  const type = messageType || messageTypeForFile(file);
   const draft = optimistic(roomId, {
-    message_type: messageTypeForFile(file),
+    message_type: type,
     content: caption,
     is_view_once: viewOnce,
     view_once_opened_by: [],
     mentions,
     attachments: [{ id: `local-${Date.now()}`, file: previewUrl, file_name: file.name, file_size: file.size, mime_type: file.type }],
     _progress: 0,
-    _retry: { kind: "file", file, caption, replyToId: replyTo?.id, viewOnce, mentions },
+    _retry: { kind: "file", file, caption, replyToId: replyTo?.id, viewOnce, mentions, messageType },
   });
   try {
     const saved = await messageApi.upload(
       {
         room: roomId,
         file,
-        message_type: messageTypeForFile(file),
+        message_type: type,
         content: caption,
         reply_to: replyTo?.id,
         client_message_id: draft.client_message_id,
@@ -441,7 +453,7 @@ export function retryMessage(roomId, message) {
   dispatch({ type: "messages/remove", roomId, ids: [message.client_message_id] });
   const replyTo = retry.replyToId ? { id: retry.replyToId } : undefined;
   if (retry.kind === "text") sendText(roomId, retry.content, replyTo, { mentions: retry.mentions, linkPreview: retry.linkPreview });
-  if (retry.kind === "file") sendFile(roomId, retry.file, { caption: retry.caption, replyTo, viewOnce: retry.viewOnce, mentions: retry.mentions });
+  if (retry.kind === "file") sendFile(roomId, retry.file, { caption: retry.caption, replyTo, viewOnce: retry.viewOnce, mentions: retry.mentions, messageType: retry.messageType });
   if (retry.kind === "poll") sendPoll(roomId, retry.poll);
   if (retry.kind === "location") sendLocation(roomId, retry.location);
   if (retry.kind === "voice") sendVoice(roomId, retry.blob, retry.seconds, retry.waveform, retry.viewOnce);

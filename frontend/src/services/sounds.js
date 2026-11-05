@@ -69,3 +69,16 @@ export function preloadSounds() {
     }
   });
 }
+
+/** Settings → "Test sound": resolves false when the browser blocked it. */
+export async function testSound() {
+  try {
+    const audio = new Audio(SOURCES.ringtone);
+    audio.volume = VOLUME.ringtone;
+    await audio.play();
+    window.setTimeout(() => audio.pause(), 2500);
+    return true;
+  } catch {
+    return false;
+  }
+}

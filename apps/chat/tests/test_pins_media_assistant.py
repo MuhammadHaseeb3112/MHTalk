@@ -179,3 +179,49 @@ class AssistantTests(TestCase):
     def test_rejects_bad_history(self):
         response = self.client.post("/api/chat/ai/", {"messages": [{"role": "system", "content": "x"}]}, format="json")
         self.assertEqual(response.status_code, 400)
+
+
+class GifSearchTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.client.force_authenticate(make_user("+923000000881"))
+
+    @override_settings(GIPHY_API_KEY="")
+    def test_without_key_explains_setup(self):
+        response = self.client.get("/api/chat/gifs/?q=cat")
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("GIPHY_API_KEY", response.data["detail"])
+
+    @override_settings(GIPHY_API_KEY="k")
+    def test_search_returns_slim_results(self):
+        import io
+        import json
+
+        from django.core.cache import cache
+
+        cache.clear()
+        captured = {}
+
+        class FakeResponse(io.BytesIO):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        def fake_urlopen(url, timeout=None):
+            captured["url"] = url
+            item = {"id": "a1", "title": "Cat", "images": {
+                "original": {"mp4": "https://media.giphy.com/a1.mp4", "width": "480", "height": "270"},
+                "fixed_width": {"mp4": "https://media.giphy.com/a1-s.mp4", "url": "https://media.giphy.com/a1-s.gif"},
+                "fixed_width_still": {"url": "https://media.giphy.com/a1-still.gif"},
+            }}
+            return FakeResponse(json.dumps({"data": [item, {"id": "x", "images": {}}]}).encode())
+
+        with mock.patch("apps.chat.gifs.urllib.request.urlopen", fake_urlopen):
+            data = self.client.get("/api/chat/gifs/?q=cat").json()
+        self.assertIn("search", captured["url"])
+        self.assertIn("q=cat", captured["url"])
+        self.assertEqual(len(data["results"]), 1)
+        self.assertEqual(data["results"][0]["mp4"], "https://media.giphy.com/a1.mp4")
+        self.assertEqual(data["results"][0]["width"], 480)

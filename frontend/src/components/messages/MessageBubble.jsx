@@ -5,6 +5,7 @@ import {
   Download,
   FileText,
   Forward,
+  Image as ImageIcon,
   Phone,
   PhoneIncoming,
   PhoneMissed,
@@ -16,8 +17,10 @@ import {
   Star,
   UserRound,
   Video,
+  Video as VideoIcon,
 } from "lucide-react";
 import { mediaUrl } from "../../api/client";
+import { emojiOnly } from "../../utils/emoji";
 import { formatPhone } from "../../utils/phone";
 import { clockTime, duration as formatDuration, fileSize } from "../../utils/format";
 import { attachmentKind, callSummary, messageKind, parseSpecial, previewText, URL_PATTERN } from "../../utils/messages";
@@ -191,6 +194,27 @@ function ImageContent({ attachment, onOpen, progress, pending }) {
   );
 }
 
+/** GIF (from GIPHY): plays on its own, muted and looping, like WhatsApp. */
+function GifContent({ payload }) {
+  const style = mediaBox(payload.width, payload.height);
+  return (
+    <span className="media media--gif" style={style}>
+      <video src={payload.mp4} poster={payload.still || undefined} autoPlay loop muted playsInline aria-label={payload.title || "GIF"} />
+      <span className="media__gif-badge">GIF</span>
+    </span>
+  );
+}
+
+/** Sticker: transparent image, no bubble. */
+function StickerContent({ attachment, pending }) {
+  return (
+    <span className="sticker-msg">
+      <img src={mediaUrl(attachment.file)} alt="Sticker" loading="lazy" draggable={false} />
+      {pending ? <span className="sticker-msg__pending" /> : null}
+    </span>
+  );
+}
+
 function VideoContent({ attachment, onOpen, progress, pending }) {
   const [meta, setMeta] = useState(null);
   const [failed, setFailed] = useState(false);
@@ -278,25 +302,42 @@ function CallCard({ event, myId, onCall }) {
   );
 }
 
-function StatusReactionCard({ payload, onOpen }) {
+/** Reaction or reply to a status: WhatsApp's "Name · Status" card + the reply. */
+function StatusReactionCard({ payload, onOpen, ownerName }) {
+  const media = payload.status_media ? mediaUrl(payload.status_media) : "";
+  const type = payload.status_type;
+  const emojiReply = payload.emoji || (payload.text && emojiOnly(payload.text)) || "";
+  let thumb;
+  if (media && type === "IMAGE") thumb = <img src={media} alt="" />;
+  else if (media && type === "VIDEO") thumb = <video src={`${media}#t=0.5`} preload="metadata" muted playsInline />;
+  else
+    thumb = (
+      <span className="status-reaction__text-thumb" style={{ background: payload.status_bg || "var(--accent)", color: payload.status_fg || "#fff" }}>
+        {(payload.status_text || "").slice(0, 40)}
+      </span>
+    );
   return (
-    <div
-      className="status-reaction is-clickable"
-      role="button"
-      tabIndex={0}
-      title="View status"
-      onClick={(event) => {
-        event.stopPropagation();
-        onOpen();
-      }}
-      onKeyDown={(event) => event.key === "Enter" && onOpen()}
-    >
-      <div className="status-reaction__preview">
-        {payload.status_media && payload.status_type === "IMAGE" ? <img src={mediaUrl(payload.status_media)} alt="" /> : null}
-        <span>{payload.status_text || (payload.status_type === "VIDEO" ? "Video status" : payload.status_type === "IMAGE" ? "Photo status" : "Status")}</span>
+    <div className="status-reaction is-clickable">
+      <div
+        className="status-reaction__preview"
+        role="button"
+        tabIndex={0}
+        title="View status"
+        onClick={(event) => {
+          event.stopPropagation();
+          onOpen();
+        }}
+        onKeyDown={(event) => event.key === "Enter" && onOpen()}
+      >
+        <span className="status-reaction__who">
+          <strong>{ownerName} · Status</strong>
+          <span className="status-reaction__type">
+            {type === "VIDEO" ? <><VideoIcon size={14} /> Video</> : type === "IMAGE" ? <><ImageIcon size={14} /> Photo</> : payload.status_text || "Status"}
+          </span>
+        </span>
+        <span className="status-reaction__thumb">{thumb}</span>
       </div>
-      <span className="status-reaction__emoji">{payload.emoji}</span>
-      <span className="status-reaction__label">Reacted to a status</span>
+      {emojiReply ? <span className="status-reaction__emoji">{emojiReply}</span> : <span className="status-reaction__reply">{payload.text}</span>}
     </div>
   );
 }
@@ -367,10 +408,10 @@ function MessageBubble({
   const kind = messageKind(message);
   const attachments = message.attachments || [];
   const first = attachments[0];
-  const special = kind === "call" || kind === "status_reaction" ? parseSpecial(message.content) : null;
+  const special = kind === "call" || kind === "status_reaction" || kind === "gif" ? parseSpecial(message.content) : null;
   const caption = kind === "image" || kind === "video" ? message.content : "";
-  const emojiOnly = kind === "text" && message.content && message.content.length <= 24 && EMOJI_ONLY.test(message.content);
-  const isMedia = (kind === "image" || kind === "video") && !caption;
+  const emojiOnly = (kind === "text" && message.content && message.content.length <= 24 && EMOJI_ONLY.test(message.content)) || kind === "sticker";
+  const isMedia = ((kind === "image" || kind === "video") && !caption) || kind === "gif";
   const pending = Boolean(message._pending);
 
   const act = (type) => (event) => onAction(type, message, event);
@@ -388,6 +429,12 @@ function MessageBubble({
       break;
     case "image":
       body = <ImageContent attachment={first} onOpen={() => onAction("openMedia", message)} progress={message._progress} pending={pending} />;
+      break;
+    case "gif":
+      body = <GifContent payload={special} />;
+      break;
+    case "sticker":
+      body = <StickerContent attachment={first} pending={pending} />;
       break;
     case "video":
       body = <VideoContent attachment={first} onOpen={() => onAction("openMedia", message)} progress={message._progress} pending={pending} />;
@@ -417,7 +464,13 @@ function MessageBubble({
       body = <CallCard event={special} myId={myId} onCall={(type) => onAction("call", message, { type })} />;
       break;
     case "status_reaction":
-      body = <StatusReactionCard payload={special} onOpen={() => onAction("openStatus", message, special)} />;
+      body = (
+        <StatusReactionCard
+          payload={special}
+          ownerName={Number(special?.owner_id) === Number(myId) ? "You" : nameOf(special?.owner_id)}
+          onOpen={() => onAction("openStatus", message, special)}
+        />
+      );
       break;
     case "poll":
       body = <PollCard message={message} myId={myId} userOf={userOf} nameOf={nameOf} onAction={onAction} />;

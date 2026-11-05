@@ -4,6 +4,7 @@ import EmojiPicker from "../conversation/EmojiPicker";
 import { IconButton } from "../common/ui";
 
 const ASPECTS = [
+  { id: "free", label: "Free" },
   { id: "original", label: "Original" },
   { id: "1:1", label: "Square", value: 1 },
   { id: "4:3", label: "4:3", value: 4 / 3 },
@@ -22,7 +23,8 @@ export default function ImageEditor({ file, url, onCancel, onApply }) {
   const [natural, setNatural] = useState(null);
   const [stage, setStage] = useState({ w: 600, h: 420 });
   const [rotation, setRotation] = useState(0); // multiples of 90
-  const [aspect, setAspect] = useState("original");
+  const [aspect, setAspect] = useState("free");
+  const [crop, setCrop] = useState(null); // free crop box size {w, h} (null = whole photo)
   const [zoom, setZoom] = useState(1); // multiplier over cover-fit
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [stickers, setStickers] = useState([]);
@@ -44,15 +46,29 @@ export default function ImageEditor({ file, url, onCancel, onApply }) {
     () => (natural ? (rotation % 180 === 0 ? { w: natural.w, h: natural.h } : { w: natural.h, h: natural.w }) : null),
     [natural, rotation],
   );
-  const ratio = aspect === "original" ? (rotated ? rotated.w / rotated.h : 1) : ASPECTS.find((item) => item.id === aspect).value;
-  let frameW = stage.w;
-  let frameH = frameW / ratio;
-  if (frameH > stage.h) {
-    frameH = stage.h;
-    frameW = frameH * ratio;
+  let frameW;
+  let frameH;
+  let scale;
+  // Free crop: the whole photo fits in the stage, and you pull the corners /
+  // edges of the crop box in (like a phone's photo editor).
+  const contain = rotated ? Math.min(stage.w / rotated.w, stage.h / rotated.h) : 1;
+  const maxW = rotated ? Math.min(stage.w, rotated.w * contain * zoom) : stage.w;
+  const maxH = rotated ? Math.min(stage.h, rotated.h * contain * zoom) : stage.h;
+  if (aspect === "free") {
+    frameW = Math.max(60, Math.min(maxW, crop?.w ?? maxW));
+    frameH = Math.max(60, Math.min(maxH, crop?.h ?? maxH));
+    scale = contain * zoom;
+  } else {
+    const ratio = aspect === "original" ? (rotated ? rotated.w / rotated.h : 1) : ASPECTS.find((item) => item.id === aspect).value;
+    frameW = stage.w;
+    frameH = frameW / ratio;
+    if (frameH > stage.h) {
+      frameH = stage.h;
+      frameW = frameH * ratio;
+    }
+    const baseScale = rotated ? Math.max(frameW / rotated.w, frameH / rotated.h) : 1;
+    scale = baseScale * zoom;
   }
-  const baseScale = rotated ? Math.max(frameW / rotated.w, frameH / rotated.h) : 1;
-  const scale = baseScale * zoom;
 
   const clampPan = useCallback(
     (next) => {
@@ -69,13 +85,31 @@ export default function ImageEditor({ file, url, onCancel, onApply }) {
 
   function onPointerDown(event) {
     if (event.target.closest(".sticker")) return;
+    const handle = event.target.closest("[data-handle]")?.dataset.handle;
+    if (handle) {
+      event.stopPropagation();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      dragRef.current = { type: "resize", handle, x: event.clientX, y: event.clientY, start: { w: frameW, h: frameH } };
+      return;
+    }
     event.currentTarget.setPointerCapture(event.pointerId);
     dragRef.current = { type: "pan", x: event.clientX, y: event.clientY, start: view };
   }
   function onPointerMove(event) {
     const drag = dragRef.current;
     if (!drag) return;
-    if (drag.type === "pan") {
+    if (drag.type === "resize") {
+      // The box stays centred, so each edge moves by the drag and the size by twice that.
+      const dx = event.clientX - drag.x;
+      const dy = event.clientY - drag.y;
+      let w = drag.start.w;
+      let h = drag.start.h;
+      if (drag.handle.includes("e")) w += dx * 2;
+      if (drag.handle.includes("w")) w -= dx * 2;
+      if (drag.handle.includes("s")) h += dy * 2;
+      if (drag.handle.includes("n")) h -= dy * 2;
+      setCrop({ w: Math.max(60, Math.min(maxW, w)), h: Math.max(60, Math.min(maxH, h)) });
+    } else if (drag.type === "pan") {
       setPan(clampPan({ x: drag.start.x + event.clientX - drag.x, y: drag.start.y + event.clientY - drag.y }));
     } else if (drag.type === "sticker") {
       const dx = (event.clientX - drag.x) / frameW;
@@ -90,6 +124,7 @@ export default function ImageEditor({ file, url, onCancel, onApply }) {
   function rotate(direction) {
     setRotation((value) => (value + direction * 90 + 360) % 360);
     setPan({ x: 0, y: 0 });
+    setCrop(null);
   }
 
   async function apply() {
@@ -133,7 +168,7 @@ export default function ImageEditor({ file, url, onCancel, onApply }) {
         <IconButton icon={X} label="Cancel editing" onClick={onCancel} />
         <div className="editor__aspects" role="radiogroup" aria-label="Crop ratio">
           {ASPECTS.map((item) => (
-            <button key={item.id} type="button" role="radio" aria-checked={aspect === item.id} className={`chip ${aspect === item.id ? "is-active" : ""}`} onClick={() => { setAspect(item.id); setPan({ x: 0, y: 0 }); }}>
+            <button key={item.id} type="button" role="radio" aria-checked={aspect === item.id} className={`chip ${aspect === item.id ? "is-active" : ""}`} onClick={() => { setAspect(item.id); setPan({ x: 0, y: 0 }); setCrop(null); }}>
               {item.label}
             </button>
           ))}
@@ -149,7 +184,7 @@ export default function ImageEditor({ file, url, onCancel, onApply }) {
       </div>
       <div className="editor__stage" ref={stageRef}>
         <div
-          className="editor__frame"
+          className={`editor__frame ${aspect === "free" ? "is-free" : ""}`}
           style={{ width: frameW, height: frameH }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -190,6 +225,11 @@ export default function ImageEditor({ file, url, onCancel, onApply }) {
             </span>
           ))}
           <span className="editor__grid" aria-hidden />
+          {aspect === "free"
+            ? ["n", "s", "e", "w", "nw", "ne", "sw", "se"].map((handle) => (
+                <span key={handle} className={`editor__handle editor__handle--${handle}`} data-handle={handle} aria-hidden />
+              ))
+            : null}
         </div>
         {emojiOpen ? (
           <EmojiPicker
@@ -213,7 +253,7 @@ export default function ImageEditor({ file, url, onCancel, onApply }) {
             <Trash2 size={16} /> Remove emoji
           </button>
         ) : (
-          <span className="editor__hint">Drag to reposition · scroll to zoom</span>
+          <span className="editor__hint">{aspect === "free" ? "Drag the corners or edges to crop · drag the photo to move" : "Drag to reposition · scroll to zoom"}</span>
         )}
       </div>
     </div>

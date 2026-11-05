@@ -23,6 +23,10 @@ import { contactsByUser, displayUserName, roomTitle } from "../../utils/messages
 import { Avatar } from "../common/ui";
 import GroupCallScreen, { GroupCallAudio } from "./GroupCallScreen";
 
+// Phone browsers (Chrome Android, Safari iOS) don't let websites share the
+// screen, only desktop browsers do.
+const canShareScreen = typeof navigator !== "undefined" && Boolean(navigator.mediaDevices?.getDisplayMedia) && !/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
 const CALL_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 const CORNERS = ["br", "bl", "tr", "tl"];
 
@@ -36,7 +40,7 @@ function MediaView({ stream, className = "", mirrored, fit = "cover" }) {
 }
 
 /** Small draggable preview: click to swap with the big view, drag to another corner. */
-function PictureInPicture({ corner, onCorner, onSwap, children, label }) {
+function PictureInPicture({ corner, onCorner, onSwap, children, label, action = null }) {
   const drag = useRef(null);
   const [offset, setOffset] = useState(null);
   return (
@@ -85,7 +89,7 @@ function PictureInPicture({ corner, onCorner, onSwap, children, label }) {
       }}
     >
       {children}
-      <span className="call-pip__hint"><Repeat size={14} /></span>
+      {action || <span className="call-pip__hint"><Repeat size={14} /></span>}
     </div>
   );
 }
@@ -118,7 +122,98 @@ function IncomingCard({ call, name, photo, subtitle, onAccept, onDecline, onDism
   );
 }
 
-/** Minimized call: a small bar so you can keep chatting during the call. */
+/**
+ * Minimized 1:1 call, like WhatsApp: a small floating window with the other
+ * person's video (or photo) that you can drag anywhere; tap it to go back.
+ */
+function FloatingCall({ call, name, photo, status, remoteStream, remoteVideoOn, onExpand, onHangUp, onToggleMute }) {
+  const ref = useRef(null);
+  const drag = useRef(null);
+  const [pos, setPos] = useState(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem("mhtalk_float_pos") || "null");
+    } catch {
+      return null;
+    }
+  });
+  const clamp = (x, y) => {
+    const box = ref.current?.getBoundingClientRect();
+    const w = box?.width || 180;
+    const h = box?.height || 240;
+    return { x: Math.min(Math.max(8, x), window.innerWidth - w - 8), y: Math.min(Math.max(8, y), window.innerHeight - h - 8) };
+  };
+  useEffect(() => {
+    const onResize = () => setPos((current) => (current ? clamp(current.x, current.y) : current));
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return createPortal(
+    <div
+      ref={ref}
+      className={`call-float ${remoteVideoOn ? "has-video" : ""}`}
+      style={pos ? { left: pos.x, top: pos.y, right: "auto", bottom: "auto" } : undefined}
+      role="region"
+      aria-label={`Call with ${name}. Drag to move, tap to open.`}
+      onPointerDown={(event) => {
+        if (event.target.closest("button")) return;
+        const box = ref.current.getBoundingClientRect();
+        drag.current = { dx: event.clientX - box.left, dy: event.clientY - box.top, x: event.clientX, y: event.clientY, moved: false };
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+      }}
+      onPointerMove={(event) => {
+        const state = drag.current;
+        if (!state) return;
+        if (!state.moved && Math.hypot(event.clientX - state.x, event.clientY - state.y) < 6) return;
+        state.moved = true;
+        setPos(clamp(event.clientX - state.dx, event.clientY - state.dy));
+      }}
+      onPointerUp={() => {
+        const state = drag.current;
+        drag.current = null;
+        if (!state) return;
+        if (!state.moved) onExpand();
+        else {
+          try {
+            sessionStorage.setItem("mhtalk_float_pos", JSON.stringify(ref.current ? { x: ref.current.offsetLeft, y: ref.current.offsetTop } : pos));
+          } catch {
+            /* ignore */
+          }
+        }
+      }}
+      onPointerCancel={() => {
+        drag.current = null;
+      }}
+    >
+      {remoteVideoOn ? (
+        <MediaView stream={remoteStream} className="call-float__video" />
+      ) : (
+        <div className="call-float__who">
+          <Avatar src={photo} name={name} size={64} />
+        </div>
+      )}
+      <div className="call-float__info">
+        <strong>{name}</strong>
+        <span>{status}</span>
+      </div>
+      {call.phase !== "ended" ? (
+        <div className="call-float__actions">
+          <button type="button" className={`call-mini__btn ${call.muted ? "is-off" : ""}`} onClick={onToggleMute} aria-label={call.muted ? "Unmute" : "Mute"}>
+            {call.muted ? <MicOff size={16} /> : <Mic size={16} />}
+          </button>
+          <button type="button" className="call-mini__btn" onClick={onExpand} aria-label="Back to call">
+            <Maximize2 size={16} />
+          </button>
+          <button type="button" className="call-mini__btn call-mini__btn--end" onClick={onHangUp} aria-label="End call">
+            <PhoneOff size={16} />
+          </button>
+        </div>
+      ) : null}
+    </div>,
+    document.body,
+  );
+}
+
+/** Minimized group call: a small bar so you can keep chatting during the call. */
 function MiniCall({ call, name, photo, status, onExpand, onHangUp, onToggleMute }) {
   return createPortal(
     <div className="call-mini" role="region" aria-label={`Call with ${name}`}>
@@ -270,7 +365,21 @@ export default function CallOverlay({
     return (
       <>
         {audio}
-        <MiniCall call={call} name={name} photo={photo} status={status} onExpand={onToggleMinimized} onHangUp={onHangUp} onToggleMute={onToggleMute} />
+        {call.group ? (
+          <MiniCall call={call} name={name} photo={photo} status={status} onExpand={onToggleMinimized} onHangUp={onHangUp} onToggleMute={onToggleMute} />
+        ) : (
+          <FloatingCall
+            call={call}
+            name={name}
+            photo={photo}
+            status={status}
+            remoteStream={remoteStream}
+            remoteVideoOn={Boolean(remoteStream?.getVideoTracks().some((track) => track.readyState === "live")) && (!call.remoteCameraOff || call.remoteSharing)}
+            onExpand={onToggleMinimized}
+            onHangUp={onHangUp}
+            onToggleMute={onToggleMute}
+          />
+        )}
       </>
     );
   }
@@ -358,7 +467,7 @@ export default function CallOverlay({
                 </div>
               ) : null}
             </div>
-            <button
+            {canShareScreen ? <button
               type="button"
               className={`call-icon ${call.sharing ? "is-active" : ""}`}
               onClick={onToggleShare}
@@ -367,7 +476,7 @@ export default function CallOverlay({
               disabled={!connected}
             >
               {call.sharing ? <ScreenShareOff size={24} /> : <MonitorUp size={24} />}
-            </button>
+            </button> : null}
           </div>
 
           <div className="call-bar__group call-bar__group--right">
@@ -449,7 +558,30 @@ export default function CallOverlay({
           </div>
         )}
         {pip ? (
-          <PictureInPicture corner={corner} onCorner={setCorner} onSwap={() => setSwapped((value) => !value)} label="Swap videos">
+          <PictureInPicture
+            corner={corner}
+            onCorner={setCorner}
+            onSwap={() => setSwapped((value) => !value)}
+            label="Swap videos"
+            action={
+              onSwitchCamera && !swapped && myVideoOn && !shareStream ? (
+                <button
+                  type="button"
+                  className="call-pip__switch"
+                  aria-label="Switch camera"
+                  title="Switch camera"
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onPointerUp={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onSwitchCamera();
+                  }}
+                >
+                  <SwitchCamera size={18} />
+                </button>
+              ) : null
+            }
+          >
             {pip}
           </PictureInPicture>
         ) : null}

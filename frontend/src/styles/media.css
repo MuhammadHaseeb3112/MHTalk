@@ -760,3 +760,74 @@
     grid-template-columns: repeat(3, 1fr);
   }
 }
+
+/* Free crop: the whole photo stays visible (dimmed outside the box) and the
+   box has corner / edge handles to drag, like a phone's crop tool. */
+.editor__frame.is-free {
+  overflow: visible;
+  box-shadow: none;
+  outline: none;
+}
+.editor__frame.is-free::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  outline: 2px solid #fff;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6);
+}
+.editor__frame.is-free .editor__grid,
+.editor__frame.is-free .sticker {
+  z-index: 3;
+}
+.editor__handle {
+  position: absolute;
+  z-index: 4;
+  touch-action: none;
+}
+.editor__handle--n,
+.editor__handle--s {
+  left: 50%;
+  width: 44px;
+  height: 22px;
+  margin-left: -22px;
+  cursor: ns-resize;
+}
+.editor__handle--e,
+.editor__handle--w {
+  top: 50%;
+  width: 22px;
+  height: 44px;
+  margin-top: -22px;
+  cursor: ew-resize;
+}
+.editor__handle--n { top: -11px; }
+.editor__handle--s { bottom: -11px; }
+.editor__handle--e { right: -11px; }
+.editor__handle--w { left: -11px; }
+.editor__handle--n::before,
+.editor__handle--s::before,
+.editor__handle--e::before,
+.editor__handle--w::before {
+  content: "";
+  position: absolute;
+  inset: 8px 6px;
+  border-radius: 3px;
+  background: #fff;
+}
+.editor__handle--e::before,
+.editor__handle--w::before {
+  inset: 6px 8px;
+}
+.editor__handle--nw,
+.editor__handle--ne,
+.editor__handle--sw,
+.editor__handle--se {
+  width: 30px;
+  height: 30px;
+}
+.editor__handle--nw { left: -6px; top: -6px; border-left: 4px solid #fff; border-top: 4px solid #fff; cursor: nwse-resize; }
+.editor__handle--ne { right: -6px; top: -6px; border-right: 4px solid #fff; border-top: 4px solid #fff; cursor: nesw-resize; }
+.editor__handle--sw { left: -6px; bottom: -6px; border-left: 4px solid #fff; border-bottom: 4px solid #fff; cursor: nesw-resize; }
+.editor__handle--se { right: -6px; bottom: -6px; border-right: 4px solid #fff; border-bottom: 4px solid #fff; cursor: nwse-resize; }

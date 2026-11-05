@@ -284,6 +284,9 @@
     width: 100%;
     max-width: none;
     min-width: 0;
+    /* min-height 0: long screens (settings, calls, profile) scroll inside
+       instead of pushing their header off the top of the phone screen */
+    min-height: 0;
     flex: 1;
     border-right: 0;
   }
@@ -297,6 +300,7 @@
   .app.is-mobile-main .main {
     display: flex;
     flex: 1;
+    min-height: 0;
     height: 100%;
   }
   .drawer {

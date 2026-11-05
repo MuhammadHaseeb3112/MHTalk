@@ -5,7 +5,7 @@ import { errorMessage } from "../../api/client";
 import { realtime } from "../../services/realtime";
 import { getNotificationPrefs } from "../../services/notify";
 import { toast } from "../../services/toast";
-import { editMessage, receiveMessage, sendLocation, sendPoll, sendText, sendVoice } from "../../store/actions";
+import { editMessage, receiveMessage, sendGif, sendLocation, sendPoll, sendSticker, sendText, sendVoice } from "../../store/actions";
 import { useStore } from "../../store/store";
 import { previewText, attachmentKind, profileName, URL_PATTERN } from "../../utils/messages";
 import { openFilePicker } from "../../utils/files";
@@ -431,7 +431,22 @@ export default function Composer({ room, replyTo, editing, onClearReply, onClear
           />
         </div>
       ) : null}
-      {emojiOpen ? <EmojiPicker className="emoji-picker--composer" onPick={insertEmoji} onClose={() => setEmojiOpen(false)} ignoreRefs={[emojiBtnRef]} /> : null}
+      {emojiOpen ? <EmojiPicker
+          className="emoji-picker--composer"
+          onPick={insertEmoji}
+          onGif={(gif) => {
+            sendGif(room.id, gif, replyTo);
+            if (replyTo) onClearReply();
+            setEmojiOpen(false);
+          }}
+          onSticker={(file) => {
+            sendSticker(room.id, file, replyTo);
+            if (replyTo) onClearReply();
+            setEmojiOpen(false);
+          }}
+          onClose={() => setEmojiOpen(false)}
+          ignoreRefs={[emojiBtnRef]}
+        /> : null}
       {recording ? (
         <VoiceRecorder
           hold={recording === "hold" && !gesture.locked}

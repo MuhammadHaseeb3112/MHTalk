@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react";
-import { Clock3 } from "lucide-react";
+import { Clock3, Smile, Sticker } from "lucide-react";
+import { GifPanel, StickerPanel } from "./GifStickerPanels";
 import { useDismiss } from "../../hooks";
 import { EMOJI_CATEGORIES, recentEmoji, rememberEmoji, searchEmoji } from "../../utils/emoji";
 import { SearchInput } from "../common/ui";
@@ -8,7 +9,8 @@ import { SearchInput } from "../common/ui";
  * Emoji panel with category tabs, keyword search and recents.
  * Closes on outside click / Escape (and unmounts when the chat changes).
  */
-export default function EmojiPicker({ onPick, onClose, className = "", ignoreRefs = [] }) {
+export default function EmojiPicker({ onPick, onGif = null, onSticker = null, onClose, className = "", ignoreRefs = [] }) {
+  const [mode, setMode] = useState("emoji"); // emoji | gif | sticker (chat composer only)
   const ref = useRef(null);
   const gridRef = useRef(null);
   const [query, setQuery] = useState("");
@@ -45,6 +47,33 @@ export default function EmojiPicker({ onPick, onClose, className = "", ignoreRef
   }
 
   const tabs = [...(recent.length ? [{ id: "recent", icon: <Clock3 size={18} />, label: "Recent" }] : []), ...EMOJI_CATEGORIES.map((c) => ({ id: c.id, icon: <span className="emoji">{c.icon}</span>, label: c.label }))];
+
+  const modes = onGif || onSticker ? (
+    <div className="emoji-picker__modes" role="tablist" aria-label="Emoji, GIFs and stickers">
+      <button type="button" role="tab" aria-selected={mode === "emoji"} className={mode === "emoji" ? "is-active" : ""} onClick={() => setMode("emoji")} aria-label="Emoji">
+        <Smile size={20} />
+      </button>
+      {onGif ? (
+        <button type="button" role="tab" aria-selected={mode === "gif"} className={mode === "gif" ? "is-active" : ""} onClick={() => setMode("gif")} aria-label="GIFs">
+          <span className="emoji-picker__gif-label">GIF</span>
+        </button>
+      ) : null}
+      {onSticker ? (
+        <button type="button" role="tab" aria-selected={mode === "sticker"} className={mode === "sticker" ? "is-active" : ""} onClick={() => setMode("sticker")} aria-label="Stickers">
+          <Sticker size={20} />
+        </button>
+      ) : null}
+    </div>
+  ) : null;
+
+  if (mode !== "emoji") {
+    return (
+      <div ref={ref} className={`emoji-picker ${className}`} role="dialog" aria-label={mode === "gif" ? "GIFs" : "Stickers"} onMouseDown={(event) => event.target.closest("input") || event.preventDefault()}>
+        {mode === "gif" ? <GifPanel onPick={onGif} /> : <StickerPanel onPick={onSticker} />}
+        {modes}
+      </div>
+    );
+  }
 
   return (
     <div ref={ref} className={`emoji-picker ${className}`} role="dialog" aria-label="Emoji picker" onMouseDown={(event) => event.preventDefault()}>
@@ -96,6 +125,7 @@ export default function EmojiPicker({ onPick, onClose, className = "", ignoreRef
           </>
         )}
       </div>
+      {modes}
     </div>
   );
 }

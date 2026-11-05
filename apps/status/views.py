@@ -409,7 +409,8 @@ class StatusReactionAPIView(APIView):
 
         serializer = ReactToStatusSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        emoji = serializer.validated_data["emoji"]
+        emoji = serializer.validated_data.get("emoji") or ""
+        text = serializer.validated_data.get("text") or ""
 
         with transaction.atomic():
             room = (
@@ -439,7 +440,10 @@ class StatusReactionAPIView(APIView):
                 "status_type": status_obj.status_type,
                 "status_text": (status_obj.content or "").strip()[:180],
                 "status_media": media_url,
+                "status_bg": getattr(status_obj, "background_color", "") or "",
+                "status_fg": getattr(status_obj, "text_color", "") or "",
                 "emoji": emoji,
+                "text": text,
                 "reactor_id": request.user.id,
                 "owner_id": status_obj.user_id,
                 "status_created_at": status_obj.created_at.isoformat(),
@@ -455,11 +459,13 @@ class StatusReactionAPIView(APIView):
                 content=content,
             )
             # The status keeps the viewer's latest reaction (shown on the status).
-            reaction, _created_reaction = StatusReaction.objects.update_or_create(
-                status=status_obj,
-                reactor=request.user,
-                defaults={"emoji": emoji, "chat_message": message},
-            )
+            reaction = None
+            if emoji:
+                reaction, _created_reaction = StatusReaction.objects.update_or_create(
+                    status=status_obj,
+                    reactor=request.user,
+                    defaults={"emoji": emoji, "chat_message": message},
+                )
             room.updated_at = timezone.now()
             room.save(update_fields=["updated_at"])
 
@@ -470,9 +476,9 @@ class StatusReactionAPIView(APIView):
         message_data = MessageSerializer(message, context={"request": request}).data
         return Response(
             {
-                "message": "Status reaction sent in chat.",
+                "message": "Status reaction sent in chat." if emoji else "Status reply sent in chat.",
                 "room_id": room.id,
-                "status_reaction": {"id": reaction.id, "emoji": reaction.emoji, "status_id": status_obj.id},
+                "status_reaction": {"id": reaction.id, "emoji": reaction.emoji, "status_id": status_obj.id} if reaction else None,
                 "chat_message": message_data,
             },
             status=status.HTTP_200_OK,

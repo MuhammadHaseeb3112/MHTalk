@@ -7,6 +7,7 @@ import { formatPhone } from "./phone";
 
 export const CALL_PREFIX = "__MHTALK_CALL_EVENT__:";
 export const STATUS_REACTION_PREFIX = "__MHTALK_STATUS_REACTION__:";
+export const GIF_PREFIX = "__MHTALK_GIF__:";
 /** Chat notices such as "You turned on disappearing messages." */
 export const SYSTEM_PREFIX = "__MHTALK_SYSTEM__:";
 export const GROUP_EVENT_PREFIX = "__MHTALK_GROUP_EVENT__:";
@@ -18,7 +19,7 @@ export function parseSpecial(content) {
   if (start < 0 || end < start) return null;
   try {
     const payload = JSON.parse(content.slice(start, end + 1));
-    if (payload?.kind === "call_event" || payload?.kind === "status_reaction" || payload?.kind === "disappearing" || payload?.kind === "group_event") return payload;
+    if (payload?.kind === "call_event" || payload?.kind === "status_reaction" || payload?.kind === "gif" || payload?.kind === "disappearing" || payload?.kind === "group_event") return payload;
   } catch {
     /* not a special payload */
   }
@@ -65,6 +66,8 @@ export function messageKind(message) {
   const special = parseSpecial(message.content);
   if (special?.kind === "call_event") return "call";
   if (special?.kind === "status_reaction") return "status_reaction";
+  if (special?.kind === "gif") return "gif";
+  if (message.message_type === "STICKER" && message.attachments?.length) return "sticker";
   if (special?.kind === "group_event") return "group_event";
   if (special?.kind === "disappearing") return "system";
   if (message.is_view_once) return "view_once";
@@ -168,8 +171,12 @@ export function previewText(message, myId, nameOf) {
       return callSummary(parseSpecial(message.content), myId).label;
     case "status_reaction": {
       const payload = parseSpecial(message.content);
-      return `Reacted ${payload.emoji} to a status`;
+      return payload.text ? `↩︎ Status: ${payload.text}` : `Reacted ${payload.emoji} to a status`;
     }
+    case "gif":
+      return "GIF";
+    case "sticker":
+      return "Sticker";
     case "image":
       return message.content || "Photo";
     case "video":

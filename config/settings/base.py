@@ -371,6 +371,8 @@ MHTALK_AI_PROVIDER = config("MHTALK_AI_PROVIDER", default="gemini")
 MHTALK_AI_API_KEY = config("MHTALK_AI_API_KEY", default="")
 MHTALK_AI_MODEL = config("MHTALK_AI_MODEL", default="")
 MHTALK_AI_BASE_URL = config("MHTALK_AI_BASE_URL", default="")
+# GIF tab in the emoji panel (free key: https://developers.giphy.com/dashboard/)
+GIPHY_API_KEY = config("GIPHY_API_KEY", default="")
 
 
 # Web Push (background notifications when no tab is open). Generate a key

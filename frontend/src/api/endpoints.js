@@ -41,6 +41,7 @@ export const contactsApi = {
 };
 
 export const chatApi = {
+  gifs: (q = "", offset = 0) => api.get("chat/gifs/", { params: { q, offset } }).then((r) => r.data),
   rooms: () => api.get("chat/rooms/", { params: { archived: "all" } }).then((r) => asList(r.data)),
   roomInfo: (roomId) => api.get(`chat/rooms/${roomId}/info/`).then((r) => r.data),
   openPrivate: (userId) => api.post("chat/rooms/private/", { user_id: userId }).then((r) => r.data),
@@ -135,6 +136,7 @@ export const statusApi = {
   view: (id) => api.post(`status/${id}/view/`),
   viewers: (id) => api.get(`status/${id}/viewers/`).then((r) => asList(r.data)),
   react: (id, emoji) => api.post(`status/${id}/react/`, { emoji }).then((r) => r.data),
+  reply: (id, text) => api.post(`status/${id}/react/`, { text }).then((r) => r.data),
   remove: (id) => api.delete(`status/${id}/delete/`),
 };
 
