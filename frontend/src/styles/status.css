@@ -392,3 +392,18 @@ button.status-composer__privacy:hover {
   overflow-y: auto;
   padding: 0;
 }
+
+/* Emoji button + picker in the status reply bar */
+.status-viewer__emoji {
+  color: #fff;
+  flex: none;
+}
+.emoji-picker--status {
+  position: absolute;
+  top: auto;
+  right: auto;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  max-height: 50vh;
+}

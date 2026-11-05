@@ -3,7 +3,7 @@ import { CallContext } from "./callContext";
 import { errorMessage } from "../../api/client";
 import { callApi } from "../../api/endpoints";
 import { ManagedSocket } from "../../services/realtime";
-import { showDesktopNotification } from "../../services/notify";
+import { setCallTitle, showDesktopNotification } from "../../services/notify";
 import { loopSound, preloadSounds } from "../../services/sounds";
 import { toast } from "../../services/toast";
 import { loadCalls } from "../../store/actions";
@@ -398,7 +398,12 @@ export function CallProvider({ children }) {
         stopTone();
         setCall((current) => ({ ...current, phase: "connecting" }));
         await offerTo(session.targetId);
-      } else if (event === "offer" && !session.initiator) {
+      } else if (event === "offer") {
+        // First offer (I'm the callee), or the other side reloaded its page
+        // and rejoined: drop the dead connection and answer the new one.
+        const old = peersRef.current.get(Number(session.targetId));
+        if (old?.remoteDescription) removePeer(session.targetId);
+        if (session.initiator) setCall((current) => ({ ...current, warning: "Reconnecting…" }));
         await answerOffer(session.targetId, payload.sdp);
       } else if (event === "answer" && session.initiator) {
         const peer = peersRef.current.get(Number(session.targetId));
@@ -677,6 +682,73 @@ export function CallProvider({ children }) {
     }
   }, [signal, videoSenders]);
 
+  /** Phones: flip between the front and back camera (laptops: next camera). */
+  const switchCamera = useCallback(async () => {
+    const current = localRef.current?.getVideoTracks()[0];
+    if (!current) return;
+    const facing = current.getSettings?.().facingMode;
+    let constraints;
+    if (facing) {
+      constraints = { facingMode: { exact: facing === "environment" ? "user" : "environment" } };
+    } else {
+      const cameras = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === "videoinput");
+      const index = cameras.findIndex((device) => device.deviceId === current.getSettings?.().deviceId);
+      const next = cameras[(index + 1) % cameras.length];
+      if (!next || cameras.length < 2) {
+        toast("No other camera found.");
+        return;
+      }
+      constraints = { deviceId: { exact: next.deviceId } };
+    }
+    try {
+      // Phones can't open two cameras at once: stop the current one first.
+      current.stop();
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { ...constraints, width: { ideal: 1280 }, height: { ideal: 720 } } });
+      const track = stream.getVideoTracks()[0];
+      track.enabled = current.enabled;
+      localRef.current.removeTrack(current);
+      localRef.current.addTrack(track);
+      setLocalStream(new MediaStream(localRef.current.getTracks()));
+      if (!shareRef.current) await Promise.all(videoSenders().map((sender) => sender.replaceTrack(track)));
+      const mode = track.getSettings?.().facingMode;
+      setCall((state) => ({ ...state, facing: mode || state.facing }));
+      if (sessionRef.current) signal({ event: "switch_camera", call_id: sessionRef.current.callId });
+    } catch {
+      // Couldn't open the other camera: go back to the previous one.
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const track = stream.getVideoTracks()[0];
+        localRef.current.removeTrack(current);
+        localRef.current.addTrack(track);
+        setLocalStream(new MediaStream(localRef.current.getTracks()));
+        if (!shareRef.current) await Promise.all(videoSenders().map((sender) => sender.replaceTrack(track)));
+      } catch {
+        /* camera unavailable */
+      }
+      toast("Couldn't switch the camera.");
+    }
+  }, [signal, videoSenders]);
+
+  // How many cameras this device has (the switch button needs 2+).
+  const [cameraCount, setCameraCount] = useState(0);
+  useEffect(() => {
+    if (!localStream?.getVideoTracks().length || !navigator.mediaDevices?.enumerateDevices) return;
+    navigator.mediaDevices
+      .enumerateDevices()
+      .then((devices) => setCameraCount(devices.filter((device) => device.kind === "videoinput").length))
+      .catch(() => {});
+  }, [localStream]);
+
+  // The call in the tab title, so it's visible from other tabs.
+  const titleName = call.group ? "Group call" : displayUserName(call.peerUser, contactsByUser(getState().contacts)) || "Call";
+  useEffect(() => {
+    if (call.phase === "incoming" && !call.dismissed) setCallTitle(`📞 ${titleName} is calling…`, { blink: true });
+    else if (call.phase === "rejoin") setCallTitle("📞 Ongoing call · tap to rejoin", { blink: true });
+    else if (["outgoing", "connecting", "ongoing"].includes(call.phase)) setCallTitle(`📞 ${call.phase === "ongoing" ? "In call" : "Calling"} · ${titleName}`);
+    else setCallTitle(null);
+  }, [call.phase, call.dismissed, titleName]);
+  useEffect(() => () => setCallTitle(null), []);
+
   const stopScreenShare = useCallback(async () => {
     const share = shareRef.current;
     if (!share) return;
@@ -738,6 +810,109 @@ export function CallProvider({ children }) {
     setCall((current) => ({ ...current, dismissed: true }));
   }, [stopTone]);
 
+  /** Show the incoming-call card (from the inbox socket, or restored after a reload). */
+  const ringIncoming = useCallback(
+    (payload) => {
+      const state = getState();
+      if (Number(payload.caller) === Number(state.me?.id)) return;
+      if (sessionRef.current) {
+        if (Number(sessionRef.current.callId) === Number(payload.call_id)) return;
+        // Already in a call: decline the second one (only for me in a group call).
+        callApi.reject(payload.call_id).catch(() => {});
+        return;
+      }
+      const room = state.rooms[payload.room];
+      const peerUser = room?.participants.find((p) => Number(p.user?.id) === Number(payload.caller))?.user || payload.callerUser || { id: payload.caller };
+      const type = typeOf(payload.call_type);
+      const group = Boolean(payload.is_group);
+      sessionRef.current = group
+        ? { callId: payload.call_id, roomId: payload.room, initiator: false, type, group: true }
+        : { callId: payload.call_id, roomId: payload.room, targetId: payload.caller, initiator: false, type };
+      openRoomSocket(payload.room);
+      setCall({
+        phase: "incoming",
+        type,
+        group,
+        roomId: payload.room,
+        callId: payload.call_id,
+        peerUser,
+        callerId: payload.caller,
+        members: {},
+        status: `Incoming ${group ? "group " : ""}${type === "video" ? "video" : "voice"} call`,
+        muted: false,
+        cameraOff: type !== "video",
+        remoteCameraOff: type !== "video",
+      });
+      playTone("incoming");
+      // Tab in the background: a desktop notification too (if enabled in Settings).
+      const caller = group ? room?.name || "Group" : displayUserName(peerUser, contactsByUser(state.contacts));
+      showDesktopNotification(
+        caller,
+        `Incoming ${group ? "group " : ""}${type === "video" ? "video" : "voice"} call`,
+        () => window.dispatchEvent(new CustomEvent("mhtalk:open-room", { detail: payload.room })),
+        { tag: `call-${payload.call_id}`, requireInteraction: true },
+      );
+      if (group) loadCalls();
+    },
+    [openRoomSocket, playTone],
+  );
+
+  // After a page reload: ring again for a call that is still ringing, or
+  // offer to rejoin an ongoing 1:1 call (the server waits ~30 s for us).
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    callApi
+      .current()
+      .then((calls) => {
+        const meId = Number(getState().me?.id);
+        for (const item of calls) {
+          if (sessionRef.current) return;
+          const roomId = Number(item.room?.id ?? item.room);
+          const callerId = Number(item.caller?.id ?? item.caller);
+          const type = typeOf(item.call_type);
+          const other = (item.participants || []).map((p) => p.user).find((user) => user && Number(user.id) !== meId);
+          if (String(item.status).toUpperCase() === "RINGING") {
+            if (callerId === meId) callApi.end(item.id).catch(() => {}); // my own call, the page was reloaded
+            else ringIncoming({ call_id: item.id, room: roomId, caller: callerId, call_type: item.call_type, is_group: false, callerUser: item.caller });
+            continue;
+          }
+          if (!other) continue;
+          sessionRef.current = { callId: item.id, roomId, targetId: Number(other.id), initiator: true, type, pendingRejoin: true };
+          openRoomSocket(roomId); // tells the server we're back
+          setCall({
+            phase: "rejoin",
+            type,
+            roomId,
+            callId: item.id,
+            peerUser: getState().rooms[roomId]?.otherUser || other,
+            status: `Ongoing ${type === "video" ? "video" : "voice"} call`,
+            muted: false,
+            cameraOff: type !== "video",
+            remoteCameraOff: type !== "video",
+          });
+          return;
+        }
+      })
+      .catch(() => {});
+  }, [openRoomSocket, ringIncoming]);
+
+  const rejoin = useCallback(async () => {
+    const session = sessionRef.current;
+    if (!session?.pendingRejoin) return;
+    setCall((current) => ({ ...current, phase: "connecting", status: "Reconnecting…" }));
+    try {
+      await getMedia(session.type);
+      await roomSocketRef.current?.whenOpen();
+      sessionRef.current = { ...session, pendingRejoin: false };
+      await offerTo(session.targetId);
+    } catch (error) {
+      toast.error(error?.message || "Couldn't rejoin the call.");
+      cleanup();
+    }
+  }, [cleanup, getMedia, offerTo]);
+
   // Incoming calls arrive on the per-user call inbox.
   useEffect(() => {
     const inbox = new ManagedSocket({
@@ -745,49 +920,13 @@ export function CallProvider({ children }) {
       ping: false,
       onMessage: async (packet) => {
         if (packet?.event !== "incoming_call") return;
-        const payload = packet.payload || {};
-        const state = getState();
-        if (Number(payload.caller) === Number(state.me?.id)) return;
-        if (sessionRef.current) {
-          // Already in a call: decline the second one (only for me in a group call).
-          callApi.reject(payload.call_id).catch(() => {});
-          return;
-        }
-        const room = state.rooms[payload.room];
-        const peerUser = room?.participants.find((p) => Number(p.user?.id) === Number(payload.caller))?.user || { id: payload.caller };
-        const type = typeOf(payload.call_type);
-        const group = Boolean(payload.is_group);
-        sessionRef.current = group
-          ? { callId: payload.call_id, roomId: payload.room, initiator: false, type, group: true }
-          : { callId: payload.call_id, roomId: payload.room, targetId: payload.caller, initiator: false, type };
-        openRoomSocket(payload.room);
-        setCall({
-          phase: "incoming",
-          type,
-          group,
-          roomId: payload.room,
-          callId: payload.call_id,
-          peerUser,
-          callerId: payload.caller,
-          members: {},
-          status: `Incoming ${group ? "group " : ""}${type === "video" ? "video" : "voice"} call`,
-          muted: false,
-          cameraOff: type !== "video",
-          remoteCameraOff: type !== "video",
-        });
-        playTone("incoming");
-        // Tab in the background: a desktop notification too (if enabled in Settings).
-        const caller = group ? room?.name || "Group" : displayUserName(peerUser, contactsByUser(state.contacts));
-        showDesktopNotification(caller, `Incoming ${group ? "group " : ""}${type === "video" ? "video" : "voice"} call`, () => {
-          window.dispatchEvent(new CustomEvent("mhtalk:open-room", { detail: payload.room }));
-        });
-        if (group) loadCalls();
+        ringIncoming(packet.payload || {});
       },
     });
     inbox.connect();
     refreshIceServers(); // warm the cache so the first call starts instantly
     return () => inbox.close();
-  }, [openRoomSocket, playTone]);
+  }, [ringIncoming]);
 
   // Server-side status changes (timeout → missed, caller cancelled).
   useEffect(() => {
@@ -839,6 +978,8 @@ export function CallProvider({ children }) {
           onHangUp={hangUp}
           onToggleMute={toggleMute}
           onToggleCamera={toggleCamera}
+          onSwitchCamera={cameraCount > 1 ? switchCamera : null}
+          onRejoin={rejoin}
           onToggleShare={toggleScreenShare}
           onReact={sendReaction}
           onToggleMinimized={toggleMinimized}

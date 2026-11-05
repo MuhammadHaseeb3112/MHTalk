@@ -172,3 +172,11 @@ class StatusReactionMessageTests(TestCase):
         reaction = StatusReaction.objects.get(status=self.status, reactor=self.viewer)
         self.assertEqual(reaction.emoji, "❤️")
         self.assertEqual(reaction.chat_message_id, messages.last().id)
+
+    def test_any_keyboard_emoji_is_a_reaction_but_text_is_not(self):
+        for emoji in ("🫠", "👍🏽", "❤️", "🇵🇰", "😂😂"):
+            response = self.client.post(f"/api/status/{self.status.id}/react/", {"emoji": emoji}, format="json")
+            self.assertEqual(response.status_code, 200, (emoji, response.content))
+        for text in ("hi", "ok 👍", ""):
+            response = self.client.post(f"/api/status/{self.status.id}/react/", {"emoji": text}, format="json")
+            self.assertEqual(response.status_code, 400, text)

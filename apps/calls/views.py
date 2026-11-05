@@ -565,6 +565,36 @@ class ActiveCallsAPIView(generics.ListAPIView):
             .order_by("-started_at")
         )
 
+class CurrentCallsAPIView(generics.ListAPIView):
+    """
+    My 1:1 calls that are still ringing or ongoing. After a page reload the
+    app uses this to show the incoming call again, or to offer "Rejoin".
+    """
+
+    serializer_class = CallSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+    pagination_class = None
+
+    @extend_schema(summary="My current 1:1 calls", responses={200: CallSerializer(many=True)}, tags=["Calls"])
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return (
+            Call.objects.filter(
+                is_group=False,
+                status__in=(CallStatus.RINGING, CallStatus.ONGOING),
+                ended_at__isnull=True,
+                participants__user=self.request.user,
+                participants__left_at__isnull=True,
+            )
+            .select_related("caller", "caller__profile", "room")
+            .prefetch_related("participants", "participants__user", "participants__user__profile")
+            .distinct()
+            .order_by("-started_at")
+        )
+
+
 class HoldCallAPIView(APIView):
 
     permission_classes = (

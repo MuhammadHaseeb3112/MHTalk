@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight, Eye, MoreVertical, Pause, Play, Send, Trash2, Volume2, VolumeX, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, MoreVertical, Pause, Play, Send, Smile, Trash2, Volume2, VolumeX, X } from "lucide-react";
 import { errorMessage, mediaUrl } from "../../api/client";
 import { statusApi } from "../../api/endpoints";
 import { loadStatus, openChatWith, sendText } from "../../store/actions";
@@ -10,9 +10,10 @@ import { detailTime, listTime } from "../../utils/format";
 import { contactsByUser, displayUserName } from "../../utils/messages";
 import { Avatar, IconButton, MenuButton, Spinner } from "../common/ui";
 import { confirmAction } from "../common/dialogs";
+import EmojiPicker from "../conversation/EmojiPicker";
+import { emojiOnly, rememberEmoji } from "../../utils/emoji";
 
 const IMAGE_MS = 6000;
-const STATUS_REACTIONS = ["😍", "😂", "😮", "😢", "🙏", "👍"];
 
 /** Mark a status seen locally so the ring/dot update immediately. */
 function markSeenLocally(statusId) {
@@ -90,6 +91,8 @@ export default function StatusViewer({ groups, startGroup = 0, startStatusId, on
   const [paused, setPaused] = useState(false);
   const [muted, setMuted] = useState(false);
   const [reply, setReply] = useState("");
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const emojiBtnRef = useRef(null);
   const [viewers, setViewers] = useState(null);
   const videoRef = useRef(null);
   const status = group?.statuses[index];
@@ -166,6 +169,7 @@ export default function StatusViewer({ groups, startGroup = 0, startStatusId, on
     try {
       await statusApi.react(status.id, emoji);
       toast.success(`Reacted ${emoji}`);
+      setPaused(false);
     } catch (error) {
       toast.error(errorMessage(error));
     }
@@ -176,6 +180,16 @@ export default function StatusViewer({ groups, startGroup = 0, startStatusId, on
     const value = reply.trim();
     if (!value) return;
     setReply("");
+    setEmojiOpen(false);
+    // Only emoji (from the phone keyboard or the picker): it's a reaction,
+    // shown in the chat as "Reacted 😂 to a status", like WhatsApp.
+    const emoji = emojiOnly(value);
+    if (emoji) {
+      rememberEmoji(emoji);
+      await react(emoji);
+      setPaused(false);
+      return;
+    }
     try {
       const roomId = await openChatWith(owner);
       const summary = status.status_type === "TEXT" ? status.content : status.status_type === "VIDEO" ? "Video status" : "Photo status";
@@ -281,14 +295,27 @@ export default function StatusViewer({ groups, startGroup = 0, startStatusId, on
             </button>
           ) : (
             <>
-              <div className="status-viewer__reactions">
-                {STATUS_REACTIONS.map((emoji) => (
-                  <button key={emoji} type="button" className="emoji" onClick={() => react(emoji)} aria-label={`React ${emoji}`}>
-                    {emoji}
-                  </button>
-                ))}
-              </div>
+              {emojiOpen ? (
+                <EmojiPicker
+                  className="emoji-picker--status"
+                  ignoreRefs={[emojiBtnRef]}
+                  onPick={(emoji) => setReply((value) => value + emoji)}
+                  onClose={() => setEmojiOpen(false)}
+                />
+              ) : null}
               <form className="status-viewer__reply" onSubmit={sendReply}>
+                <button
+                  ref={emojiBtnRef}
+                  type="button"
+                  className="icon-btn status-viewer__emoji"
+                  aria-label="Emoji"
+                  onClick={() => {
+                    setPaused(true);
+                    setEmojiOpen((value) => !value);
+                  }}
+                >
+                  <Smile size={24} />
+                </button>
                 <input value={reply} onChange={(event) => setReply(event.target.value)} onFocus={() => setPaused(true)} onBlur={() => setPaused(false)} placeholder="Reply…" maxLength={1000} />
                 <button type="submit" className="send-btn" aria-label="Send reply" disabled={!reply.trim()}>
                   <Send size={18} />

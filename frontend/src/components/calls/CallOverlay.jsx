@@ -9,6 +9,8 @@ import {
   Phone,
   PhoneOff,
   Repeat,
+  SwitchCamera,
+  Volume2,
   ScreenShareOff,
   Smile,
   Video,
@@ -157,6 +159,8 @@ export default function CallOverlay({
   onHangUp,
   onToggleMute,
   onToggleCamera,
+  onSwitchCamera = null,
+  onRejoin,
   onToggleShare,
   onReact,
   onToggleMinimized,
@@ -185,6 +189,7 @@ export default function CallOverlay({
   const [picker, setPicker] = useState(false);
   const rootRef = useRef(null);
   const remoteAudioRef = useRef(null);
+  const [soundBlocked, setSoundBlocked] = useState(false);
 
   const ticking = call.phase === "ongoing" && Boolean(call.connectedAt);
   useEffect(() => {
@@ -196,7 +201,12 @@ export default function CallOverlay({
   useEffect(() => {
     if (remoteAudioRef.current && remoteStream) {
       remoteAudioRef.current.srcObject = remoteStream;
-      remoteAudioRef.current.play?.().catch(() => {});
+      // Browsers block sound until the page was clicked once (e.g. right
+      // after a reload): then offer a button that turns it on.
+      remoteAudioRef.current
+        .play?.()
+        .then(() => setSoundBlocked(false))
+        .catch((error) => setSoundBlocked(error?.name === "NotAllowedError"));
     }
   }, [remoteStream, call.minimized, call.phase]);
 
@@ -233,6 +243,29 @@ export default function CallOverlay({
     );
   }
 
+  if (call.phase === "rejoin") {
+    return createPortal(
+      <div className="call-incoming" role="alertdialog" aria-label={`Ongoing call with ${name}`}>
+        <div className="call-incoming__top">
+          <Avatar src={photo} name={name} size={48} />
+          <div className="call-incoming__who">
+            <strong>{name}</strong>
+            <span>{call.status} · the page was reloaded</span>
+          </div>
+        </div>
+        <div className="call-incoming__actions">
+          <button type="button" className="call-pill call-pill--decline" onClick={onHangUp} aria-label="End call">
+            <PhoneOff size={18} /> End
+          </button>
+          <button type="button" className="call-pill call-pill--accept" onClick={onRejoin} aria-label="Rejoin call">
+            {call.type === "video" ? <Video size={18} /> : <Phone size={18} />} Rejoin
+          </button>
+        </div>
+      </div>,
+      document.body,
+    );
+  }
+
   if (call.minimized) {
     return (
       <>
@@ -249,7 +282,7 @@ export default function CallOverlay({
   const myTile = shareStream ? (
     <MediaView stream={shareStream} fit="contain" />
   ) : myVideoOn ? (
-    <MediaView stream={localStream} mirrored />
+    <MediaView stream={localStream} mirrored={call.facing !== "environment"} />
   ) : null;
   const remoteTile = remoteVideoOn ? <MediaView stream={remoteStream} fit="contain" /> : null;
 
@@ -295,6 +328,11 @@ export default function CallOverlay({
             >
               {call.muted ? <MicOff size={22} /> : <Mic size={22} />}
             </button>
+            {onSwitchCamera && myVideoOn && !call.sharing ? (
+              <button type="button" className="call-pill call-pill--toggle is-on" onClick={onSwitchCamera} aria-label="Switch camera" title="Switch camera (front / back)">
+                <SwitchCamera size={22} />
+              </button>
+            ) : null}
           </div>
 
           <div className="call-bar__group call-bar__group--center">
@@ -373,6 +411,18 @@ export default function CallOverlay({
   return createPortal(
     <div ref={rootRef} className={`call-screen ${main && !ringingPreview ? "has-video" : ""}`} role="dialog" aria-label={`Call with ${name}`}>
       {audio}
+
+      {soundBlocked ? (
+        <button
+          type="button"
+          className="call-screen__sound"
+          onClick={() => {
+            remoteAudioRef.current?.play?.().then(() => setSoundBlocked(false)).catch(() => {});
+          }}
+        >
+          <Volume2 size={18} /> Tap to turn on sound
+        </button>
+      ) : null}
 
       {call.remoteMuted ? (
         <span className="call-screen__badge" title={`${name} is muted`}>

@@ -145,6 +145,7 @@ export const callApi = {
   end: (id) => api.post(`calls/${id}/end/`).then((r) => r.data),
   history: () => api.get("calls/history/").then((r) => asList(r.data)),
   active: () => api.get("calls/active/").then((r) => asList(r.data)),
+  current: () => api.get("calls/current/").then((r) => asList(r.data)),
   missed: () => api.get("calls/missed/").then((r) => r.data),
   iceServers: () => api.get("calls/ice-servers/").then((r) => r.data),
   acknowledgeMissed: () => api.post("calls/missed/").then((r) => r.data),

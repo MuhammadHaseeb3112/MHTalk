@@ -418,8 +418,22 @@ class ContactStatusSerializer(serializers.Serializer):
         )
 
 class ReactToStatusSerializer(serializers.Serializer):
-    """Validate a WhatsApp-style quick reaction sent from the status viewer."""
+    """A reaction from the status viewer: any emoji (up to three), like WhatsApp."""
 
-    emoji = serializers.ChoiceField(
-        choices=("❤️", "😂", "😮", "😢", "🙏", "👍", "🔥", "👏", "🎉", "🥰", "😍", "🤔", "😡", "💯"),
-    )
+    emoji = serializers.CharField(max_length=16, trim_whitespace=True)
+
+    def validate_emoji(self, value):
+        import unicodedata
+
+        value = "".join(value.split())
+        allowed_categories = {"So", "Sk", "Mn", "Me", "Cf"}
+        has_symbol = False
+        for char in value:
+            category = unicodedata.category(char)
+            if category == "So":
+                has_symbol = True
+            if category not in allowed_categories:
+                raise serializers.ValidationError("Send an emoji.")
+        if not value or not has_symbol:
+            raise serializers.ValidationError("Send an emoji.")
+        return value

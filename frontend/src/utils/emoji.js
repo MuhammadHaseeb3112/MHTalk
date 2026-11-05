@@ -110,3 +110,16 @@ export function searchEmoji(query) {
 }
 
 export const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+
+const EMOJI_PART = /\p{Extended_Pictographic}|\p{Emoji_Modifier}|\p{Regional_Indicator}|‍|️|⃣/gu;
+
+/**
+ * The emoji in `text` when it is only emoji (at most `max` of them), else
+ * null. "😂", "❤️", "👍🏽" and "😍😍" count; "ok 👍" and "1" don't.
+ */
+export function emojiOnly(text, max = 3) {
+  const value = String(text || "").replace(/\s+/g, "");
+  if (!value || value.replace(EMOJI_PART, "") !== "" || !/\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(value)) return null;
+  const count = typeof Intl !== "undefined" && Intl.Segmenter ? [...new Intl.Segmenter().segment(value)].length : [...value].length;
+  return count <= max ? value : null;
+}

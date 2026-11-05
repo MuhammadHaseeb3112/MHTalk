@@ -743,3 +743,22 @@
     max-height: 75%;
   }
 }
+
+/* Sound was blocked by the browser (no click on the page yet) */
+.call-screen__sound {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  transform: translateX(-50%);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  animation: pulse 1.4s ease-in-out infinite;
+}

@@ -32,7 +32,7 @@ export async function requestDesktopPermission() {
   return Notification.requestPermission();
 }
 
-export function showDesktopNotification(title, body, onClick) {
+export function showDesktopNotification(title, body, onClick, options = {}) {
   const prefs = getNotificationPrefs();
   if (!prefs.desktop || !("Notification" in window) || Notification.permission !== "granted") return;
   if (document.visibilityState === "visible" && document.hasFocus()) return;
@@ -40,7 +40,9 @@ export function showDesktopNotification(title, body, onClick) {
     const notification = new Notification(title, {
       body: prefs.preview ? body : "New message",
       icon: "/pwa-192.png",
-      tag: title,
+      tag: options.tag || title,
+      requireInteraction: Boolean(options.requireInteraction),
+      renotify: Boolean(options.tag),
     });
     notification.onclick = () => {
       window.focus();
@@ -52,6 +54,29 @@ export function showDesktopNotification(title, body, onClick) {
   }
 }
 
+let baseTitle = "MHTalk";
+let titleOverride = null;
 export function setTitleBadge(count) {
-  document.title = count > 0 ? `(${count}) MHTalk` : "MHTalk";
+  baseTitle = count > 0 ? `(${count}) MHTalk` : "MHTalk";
+  if (!titleOverride) document.title = baseTitle;
+}
+
+/** A call shows in the tab title ("📞 Ayesha is calling…" blinks). Pass null to clear. */
+let titleTimer = null;
+export function setCallTitle(text, { blink = false } = {}) {
+  window.clearInterval(titleTimer);
+  titleTimer = null;
+  titleOverride = text;
+  if (!text) {
+    document.title = baseTitle;
+    return;
+  }
+  document.title = text;
+  if (blink) {
+    let on = true;
+    titleTimer = window.setInterval(() => {
+      on = !on;
+      document.title = on ? text : baseTitle;
+    }, 1000);
+  }
 }

@@ -53,3 +53,59 @@ class CallSignallingSocketTests(TransactionTestCase):
         await bob.disconnect()
         self.assertIsNone(await cache.aget(f"call_channel:{self.bob.id}"))
         await alice.disconnect()
+
+
+class CallReloadTests(CallSignallingSocketTests):
+    """A reloaded page can get its call back (ringing or ongoing)."""
+
+    def _ongoing(self):
+        from django.utils import timezone
+
+        self.call.status = "ONGOING"
+        self.call.answered_at = timezone.now()
+        self.call.save(update_fields=["status", "answered_at"])
+
+    def test_current_lists_my_ringing_and_ongoing_calls(self):
+        from rest_framework.test import APIClient
+
+        client = APIClient()
+        client.force_authenticate(self.bob)
+        data = client.get("/api/calls/current/").json()
+        self.assertEqual([c["id"] for c in data], [self.call.id])
+        self._ongoing()
+        self.assertEqual(len(client.get("/api/calls/current/").json()), 1)
+        self.call.end()
+        self.assertEqual(client.get("/api/calls/current/").json(), [])
+
+    async def test_reload_reconnect_within_grace_keeps_the_call(self):
+        from asgiref.sync import sync_to_async
+        from django.test import override_settings
+
+        await sync_to_async(self._ongoing)()
+        with override_settings(CALL_REJOIN_GRACE_SECONDS=0.5):
+            alice, bob = self.socket(self.alice), self.socket(self.bob)
+            await alice.connect()
+            await bob.connect()
+            await bob.disconnect()  # bob's page reloads...
+            bob = self.socket(self.bob)
+            await bob.connect()  # ...and comes back in time
+            import asyncio
+
+            await asyncio.sleep(0.9)
+            await sync_to_async(self.call.refresh_from_db)()
+            self.assertEqual(self.call.status, "ONGOING")
+            await bob.disconnect()  # now he really leaves
+            await asyncio.sleep(0.9)
+            await sync_to_async(self.call.refresh_from_db)()
+            self.assertEqual(self.call.status, "ENDED")
+            ended = False
+            for _ in range(10):
+                try:
+                    message = _json.loads(await alice.receive_from(timeout=1))
+                except Exception:  # noqa: BLE001
+                    break
+                if message.get("event") == "call_ended":
+                    ended = True
+                    break
+            self.assertTrue(ended, "alice was not told the call ended")
+            await alice.disconnect()

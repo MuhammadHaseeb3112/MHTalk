@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from channels.db import database_sync_to_async
@@ -12,6 +13,17 @@ from .lifecycle import cancel_ring_timeout
 from .models import Call, CallParticipant
 from .lifecycle import leave_call
 from .choices import CallStatus
+from django.conf import settings
+from django.core.cache import cache
+
+
+def _room_socket_key(room_id, user_id):
+    return f"call_room_socket:{room_id}:{user_id}"
+
+
+def rejoin_grace_seconds():
+    """How long a 1:1 call waits for someone whose page reloaded."""
+    return float(getattr(settings, "CALL_REJOIN_GRACE_SECONDS", 30))
 
 
 
@@ -57,6 +69,7 @@ class CallConsumer(AsyncJsonWebsocketConsumer):
         await self.accept()
 
         await set_call_channel(self.user.id, self.channel_name)
+        await cache.aset(_room_socket_key(self.room_id, self.user.id), self.channel_name, 3600)
 
 
         await self.broadcast(
@@ -89,7 +102,17 @@ class CallConsumer(AsyncJsonWebsocketConsumer):
             self.room_id,
         )
 
-        await self.mark_left()
+        key = _room_socket_key(self.room_id, self.user.id)
+        if await cache.aget(key) == self.channel_name:
+            await cache.adelete(key)
+
+        ongoing_call_id = await self.mark_left()
+        if ongoing_call_id:
+            grace = rejoin_grace_seconds()
+            if grace <= 0:
+                await database_sync_to_async(leave_and_announce)(ongoing_call_id, self.user.id)
+            else:
+                schedule_task(end_after_grace(ongoing_call_id, self.user.id, self.room_id, grace))
 
         # A user may have multiple tabs/sockets. Do not erase a newer
         # connection's mapping when an older socket disconnects.
@@ -174,8 +197,8 @@ class CallConsumer(AsyncJsonWebsocketConsumer):
                 participants__user=self.user,
                 # A signaling socket can disconnect during a browser reload.
                 # Keep ringing calls alive so the recipient can restore the
-                # incoming-call UI from call history; only end a call that had
-                # actually been accepted and was ongoing.
+                # incoming-call UI; an ongoing call gets a short grace period
+                # (see end_after_grace) so a reloaded page can rejoin it.
                 status=CallStatus.ONGOING,
                 is_group=False,
             )
@@ -183,12 +206,7 @@ class CallConsumer(AsyncJsonWebsocketConsumer):
             .first()
         )
 
-        if call:
-
-            leave_call(
-                call,
-                self.user,
-            )
+        return call.id if call else None
 
     async def validate_call(
         self,
@@ -1205,3 +1223,51 @@ class CallInboxConsumer(AsyncJsonWebsocketConsumer):
             "event": event["event"],
             "payload": event.get("payload", {}),
         })
+
+
+
+def leave_and_announce(call_id, user_id):
+    """End a 1:1 call for someone who left and tell the other side (sync)."""
+    from asgiref.sync import async_to_sync
+    from channels.layers import get_channel_layer
+    from django.contrib.auth import get_user_model
+
+    call = Call.objects.filter(pk=call_id).first()
+    user = get_user_model().objects.filter(pk=user_id).first()
+    if call is None or user is None or call.status != CallStatus.ONGOING:
+        return False
+    leave_call(call, user)
+    call.refresh_from_db()
+    if call.status == CallStatus.ONGOING:
+        return False
+    layer = get_channel_layer()
+    if layer is not None:
+        async_to_sync(layer.group_send)(
+            f"call_{call.room_id}",
+            {"type": "call.event", "event": "call_ended", "payload": {"call_id": call.id, "status": call.status, "user": user_id}},
+        )
+    from .events import notify_calls_changed, publish_call_message
+
+    try:
+        publish_call_message(call)
+        notify_calls_changed(call, "ended")
+    except Exception:  # noqa: BLE001
+        logger.exception("Couldn't announce the end of call %s", call.id)
+    return True
+
+
+async def end_after_grace(call_id, user_id, room_id, grace):
+    """After a reload the page has `grace` seconds to reconnect to the call."""
+    await asyncio.sleep(grace)
+    if await cache.aget(_room_socket_key(room_id, user_id)):
+        return  # back in the call
+    await database_sync_to_async(leave_and_announce)(call_id, user_id)
+
+
+_GRACE_TASKS = set()
+
+
+def schedule_task(coro):
+    task = asyncio.get_running_loop().create_task(coro)
+    _GRACE_TASKS.add(task)
+    task.add_done_callback(_GRACE_TASKS.discard)
