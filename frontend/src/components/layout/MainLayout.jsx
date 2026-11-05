@@ -53,6 +53,7 @@ const SECTION_PANELS = {
   profile: ProfilePanel,
   settings: SettingsPanel,
   ai: AssistantPanel,
+  aiChat: ChatListPanel, // MHTalk AI opened from the chat list
 };
 
 const DRAWERS = {
@@ -75,7 +76,16 @@ export default function MainLayout({ onLogout }) {
 
   useEffect(() => setTitleBadge(totalUnread), [totalUnread]);
 
-  const pushPanel = useCallback((name, props = {}) => setStack((current) => [...current, { name, props }]), []);
+  // Opening the panel that is already on top replaces it (no stacked copies
+  // when a button is clicked several times).
+  const pushPanel = useCallback(
+    (name, props = {}) =>
+      setStack((current) => {
+        const top = current[current.length - 1];
+        return top?.name === name ? [...current.slice(0, -1), { name, props }] : [...current, { name, props }];
+      }),
+    [],
+  );
   const popPanel = useCallback(() => setStack((current) => current.slice(0, -1)), []);
   const resetPanels = useCallback(() => setStack([]), []);
   const openDrawer = useCallback((type, payload = {}) => setDrawer({ type, payload }), []);
@@ -88,6 +98,15 @@ export default function MainLayout({ onLogout }) {
       loadCalls().then(acknowledgeMissedCalls);
     }
     if (next === "status") loadStatus();
+  }, []);
+
+  // MHTalk AI from the chat list: the list stays, the AI chat opens beside it.
+  const openAssistant = useCallback(() => {
+    setActiveRoom(null);
+    realtime.openRoom(null);
+    setDrawer(null);
+    setStack([]);
+    setSectionState("aiChat");
   }, []);
 
   const openRoom = useCallback(
@@ -151,8 +170,8 @@ export default function MainLayout({ onLogout }) {
   const openMedia = useCallback(() => setMediaOpen(true), []);
 
   const app = useMemo(
-    () => ({ openRoom, closeRoom, setSection, pushPanel, popPanel, resetPanels, openDrawer, closeDrawer, openMedia, onLogout, section, compact }),
-    [openRoom, closeRoom, setSection, pushPanel, popPanel, resetPanels, openDrawer, closeDrawer, openMedia, onLogout, section, compact],
+    () => ({ openRoom, closeRoom, openAssistant, setSection, pushPanel, popPanel, resetPanels, openDrawer, closeDrawer, openMedia, onLogout, section, compact }),
+    [openRoom, closeRoom, openAssistant, setSection, pushPanel, popPanel, resetPanels, openDrawer, closeDrawer, openMedia, onLogout, section, compact],
   );
 
   const SectionPanel = SECTION_PANELS[section] || ChatListPanel;
@@ -164,7 +183,7 @@ export default function MainLayout({ onLogout }) {
   let main;
   if (section === "status") main = <StatusMain />;
   else if (section === "calls") main = <CallsMain />;
-  else if (section === "ai") main = <AssistantChat />;
+  else if (section === "ai" || section === "aiChat") main = <AssistantChat />;
   else if (showChat) main = <Conversation key={activeRoomId} roomId={activeRoomId} />;
   else
     main = (
@@ -175,16 +194,19 @@ export default function MainLayout({ onLogout }) {
       />
     );
 
-  const mobileShowsMain = compact && (showChat || section === "ai");
+  // Phones show one pane: a panel opened from inside a chat (e.g. "Add to
+  // contacts") brings the side pane forward; closing it returns to the chat.
+  const panelOnTop = Boolean(top && top.name !== "archived");
+  const mobileShowsMain = compact && (showChat || section === "ai" || section === "aiChat") && !panelOnTop;
 
   return (
     <AppContext.Provider value={app}>
       <CallProvider>
         <div className={`app ${drawer ? "has-drawer" : ""} ${mobileShowsMain ? "is-mobile-main" : ""}`}>
-          <NavRail section={section} onChange={setSection} onOpenMedia={openMedia} />
+          <NavRail section={section === "aiChat" ? "chats" : section} onChange={setSection} onOpenMedia={openMedia} />
           <aside className="sidebar">
             <div className="sidebar__stack">
-              <Suspense fallback={fallback}><SectionPanel key={section} /></Suspense>
+              <Suspense fallback={fallback}><SectionPanel key={section === "aiChat" ? "chats" : section} /></Suspense>
               {OverlayPanel ? (
                 <div className="sidebar__overlay" key={`${top.name}-${stack.length}`}>
                   <Suspense fallback={fallback}><OverlayPanel {...top.props} /></Suspense>

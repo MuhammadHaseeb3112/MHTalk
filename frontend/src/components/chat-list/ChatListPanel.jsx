@@ -13,6 +13,9 @@ import { NewChatIcon } from "../common/Icons";
 import { confirmAction } from "../common/dialogs";
 import { useApp } from "../layout/AppContext";
 import ChatListItem from "./ChatListItem";
+import AssistantChatRow from "./AssistantChatRow";
+import { assistantRowIndex } from "./assistantRow";
+import { useAssistant } from "../assistant/assistantStore";
 import { useChatList } from "./useChatList";
 import { askDeleteChat } from "./roomMenu";
 
@@ -105,6 +108,13 @@ export default function ChatListPanel() {
 
   const contactMap = useMemo(() => contactsByUser(contacts), [contacts]);
   const searchingActive = Boolean(debounced.trim());
+  const assistant = useAssistant();
+  const aiQuery = debounced.trim().toLowerCase();
+  const showAssistant = filter === "all" && (!aiQuery || "mhtalk ai assistant".includes(aiQuery));
+  const aiIndex = showAssistant ? assistantRowIndex(searchingActive ? [] : rows, assistant.messages[assistant.messages.length - 1]?.at) : -1;
+  const aiRow = showAssistant ? (
+    <AssistantChatRow key="mhtalk-ai" active={app.section === "aiChat"} onOpen={app.openAssistant} />
+  ) : null;
 
   const menuItems = [
     { label: "New group", icon: Users, onClick: () => app.pushPanel("newGroup") },
@@ -231,9 +241,10 @@ export default function ChatListPanel() {
           </div>
         ) : null}
 
-        {searchingActive && rows.length ? <div className="section-label">Chats</div> : null}
+        {searchingActive && (rows.length || aiRow) ? <div className="section-label">Chats</div> : null}
         <div className="list-pad">
-          {rows.map(({ room, title, senderName, preview, reacted, typingText }) => (
+          {rows.flatMap(({ room, title, senderName, preview, reacted, typingText }, index) => [
+            index === aiIndex ? aiRow : null,
             <ChatListItem
               key={room.id}
               room={room}
@@ -249,8 +260,9 @@ export default function ChatListPanel() {
               onOpen={app.openRoom}
               onToggleSelect={toggleSelect}
               onStartSelect={startSelect}
-            />
-          ))}
+            />,
+          ])}
+          {aiIndex >= rows.length ? aiRow : null}
         </div>
 
         {searchingActive && contactHits.length ? (

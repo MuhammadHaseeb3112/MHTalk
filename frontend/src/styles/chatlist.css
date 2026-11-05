@@ -414,3 +414,14 @@ mark.hl {
 .photo-picker:hover img + span {
   opacity: 1;
 }
+
+/* MHTalk AI row in the chat list */
+.assistant-avatar--list {
+  width: 49px;
+  height: 49px;
+}
+.chat-item__verified {
+  margin-left: 3px;
+  vertical-align: -2px;
+  color: var(--accent);
+}
