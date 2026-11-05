@@ -17,6 +17,7 @@ COPY . .
 RUN SECRET_KEY=build-only DB_PASSWORD=build-only python manage.py collectstatic --noinput \
     && useradd --create-home --uid 1000 app \
     && mkdir -p /app/media \
+    && touch /app/media/.keep \
     && chown -R app:app /app/media /app/staticfiles
 
 USER app
