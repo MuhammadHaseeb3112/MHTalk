@@ -4,6 +4,7 @@ import { listTime } from "../../utils/format";
 import { callSummary, messageKind, parseSpecial, previewText } from "../../utils/messages";
 import { useStore } from "../../store/store";
 import { Avatar, Checkbox, Menu } from "../common/ui";
+import { ringFor, useStatusGroup } from "../status/statusRing";
 import { requestJoinCall } from "../calls/groupCall";
 import { buildRoomMenu } from "./roomMenu";
 import { ClockIcon, DoubleTick, SingleTick } from "../common/Icons";
@@ -94,6 +95,7 @@ function ChatListItem({
   const inThatCall = useStore((state) => Boolean(room.isGroup && state.currentCallId && Number(state.activeCalls?.[room.id]?.id) === Number(state.currentCallId)));
   const unread = room.unread > 0;
   const photo = room.isGroup ? room.groupPhoto : room.otherUser?.profile?.profile_picture;
+  const statusGroup = useStatusGroup(room.isGroup ? null : room.otherUser?.id);
 
   const pressTimer = useRef(null);
 
@@ -123,7 +125,7 @@ function ChatListItem({
     >
       {selectMode ? <Checkbox checked={selected} onChange={() => onToggleSelect(room.id)} label={`Select ${title}`} /> : null}
       <span className="avatar-wrap">
-        <Avatar src={photo} name={title} group={room.isGroup} size={49} />
+        <Avatar src={photo} name={title} group={room.isGroup} size={49} ring={ringFor(statusGroup)} />
         {room.disappearingSeconds ? (
           <span className="avatar-timer" aria-label="Disappearing messages on" title="Disappearing messages">
             <Timer size={12} strokeWidth={2.4} />

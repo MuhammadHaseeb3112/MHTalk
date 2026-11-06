@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { LocateFixed, Timer, X } from "lucide-react";
+import { LocateFixed, Radio, Timer, X } from "lucide-react";
 import { errorMessage } from "../../api/client";
 import { messageApi } from "../../api/endpoints";
 import { setDisappearing } from "../../store/actions";
@@ -159,10 +159,18 @@ function geolocationError(error) {
 }
 
 /** "Send your current location" using the browser's geolocation. */
-export function LocationDialog({ onClose, onSend }) {
+const LIVE_DURATIONS = [
+  { seconds: 900, label: "15 minutes" },
+  { seconds: 3600, label: "1 hour" },
+  { seconds: 28800, label: "8 hours" },
+];
+
+export function LocationDialog({ onClose, onSend, allowLive = true }) {
   const [state, setState] = useState({ status: "locating", position: null, error: "" });
   const [name, setName] = useState("");
   const [attempt, setAttempt] = useState(0);
+  const [liveOpen, setLiveOpen] = useState(false);
+  const [liveSeconds, setLiveSeconds] = useState(3600);
 
   useEffect(() => {
     let cancelled = false;
@@ -183,6 +191,37 @@ export function LocationDialog({ onClose, onSend }) {
   }, [attempt]);
 
   const coords = state.position;
+  const base = coords
+    ? { latitude: coords.latitude, longitude: coords.longitude, accuracy: Number.isFinite(coords.accuracy) ? Math.round(coords.accuracy) : undefined }
+    : null;
+  if (liveOpen && base) {
+    return (
+      <Modal title="Share live location" onClose={onClose} width={440} className="location-dialog">
+        <div className="location-dialog__map">
+          <MapPreview latitude={base.latitude} longitude={base.longitude} width={Math.min(392, window.innerWidth - 48)} height={160} />
+        </div>
+        <p className="location-dialog__note">Participants in this chat will see your location in real time while this chat is open on your phone.</p>
+        <div className="location-dialog__durations" role="radiogroup" aria-label="Share for">
+          {LIVE_DURATIONS.map((option) => (
+            <button
+              key={option.seconds}
+              type="button"
+              role="radio"
+              aria-checked={liveSeconds === option.seconds}
+              className={`chip ${liveSeconds === option.seconds ? "is-active" : ""}`}
+              onClick={() => setLiveSeconds(option.seconds)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <div className="location-dialog__actions">
+          <button type="button" className="btn btn--outline" onClick={() => setLiveOpen(false)}>Back</button>
+          <button type="button" className="btn btn--primary" onClick={() => onSend({ ...base, live_seconds: liveSeconds })}>Share</button>
+        </div>
+      </Modal>
+    );
+  }
   return (
     <Modal title="Send location" onClose={onClose} width={440} className="location-dialog">
       {state.status === "locating" ? (
@@ -199,7 +238,7 @@ export function LocationDialog({ onClose, onSend }) {
       {coords ? (
         <>
           <div className="location-dialog__map">
-            <MapPreview latitude={coords.latitude} longitude={coords.longitude} width={Math.min(392, window.innerWidth - 80)} height={200} />
+            <MapPreview latitude={coords.latitude} longitude={coords.longitude} width={Math.min(392, window.innerWidth - 48)} height={200} />
           </div>
           <input
             className="line-input"
@@ -227,6 +266,13 @@ export function LocationDialog({ onClose, onSend }) {
               <small>{Number.isFinite(coords.accuracy) ? `Accurate to ${Math.round(coords.accuracy)} metres` : ""}</small>
             </span>
           </button>
+          {allowLive ? <button type="button" className="location-dialog__send" onClick={() => setLiveOpen(true)}>
+            <span className="location-dialog__icon location-dialog__icon--live"><Radio size={22} /></span>
+            <span>
+              <strong>Share live location</strong>
+              <small>15 minutes, 1 hour or 8 hours</small>
+            </span>
+          </button> : null}
         </>
       ) : null}
     </Modal>

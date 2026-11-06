@@ -106,6 +106,7 @@ export const messageApi = {
         { onUploadProgress },
       )
       .then((r) => r.data.data),
+  liveLocation: (id, body) => api.post(`chat/messages/${id}/live-location/`, body).then((r) => r.data),
   vote: (id, optionIds) => api.post(`chat/messages/${id}/poll/vote/`, { option_ids: optionIds }).then((r) => r.data),
   /** View once media is only served once, with the JWT: fetch it as a blob. */
   openViewOnce: (id) => api.get(`chat/messages/${id}/view-once/`, { responseType: "blob" }).then((r) => r.data),

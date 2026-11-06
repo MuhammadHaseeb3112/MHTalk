@@ -297,7 +297,7 @@ function CallCard({ event, myId, onCall }) {
           {summary.answered ? formatDuration(event.duration) : summary.missed ? (summary.group ? "Tap to call the group" : "Tap to call back") : "Tap to call again"}
         </span>
       </span>
-      <Phone size={16} className="call-card__again" />
+      {summary.video ? <Video size={16} className="call-card__again" /> : <Phone size={16} className="call-card__again" />}
     </button>
   );
 }
@@ -489,7 +489,7 @@ function MessageBubble({
       body = <ViewOnceContent message={message} myId={myId} pending={pending} progress={message._progress} onAction={onAction} />;
       break;
     case "location":
-      body = <LocationCard content={message.content} />;
+      body = <LocationCard content={message.content} messageId={message.id} mine={isOwn} />;
       break;
     case "contact": {
       const card = typeof message.content === "object" && message.content ? message.content : {};

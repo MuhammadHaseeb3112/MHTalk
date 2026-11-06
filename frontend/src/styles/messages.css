@@ -587,7 +587,7 @@
   align-items: stretch;
   justify-content: space-between;
   gap: 8px;
-  min-height: 62px;
+  height: 62px;
   border-left: 4px solid var(--accent);
   border-radius: 7px;
   background: var(--quote-bg, var(--doc-bg));
@@ -619,15 +619,17 @@
 }
 .status-reaction__thumb {
   flex: none;
-  width: 62px;
+  width: 56px;
+  height: 62px;
+  overflow: hidden;
   display: grid;
 }
+/* A small thumbnail like WhatsApp, however tall the status picture is. */
 .status-reaction__thumb img,
 .status-reaction__thumb video,
 .status-reaction__text-thumb {
-  width: 62px;
-  height: 100%;
-  min-height: 62px;
+  width: 56px;
+  height: 62px;
   object-fit: cover;
 }
 .status-reaction__text-thumb {

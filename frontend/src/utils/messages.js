@@ -188,6 +188,7 @@ export function previewText(message, myId, nameOf) {
     case "contact":
       return `Contact: ${message.content?.name || ""}`.trim();
     case "location":
+      if (message.content?.live) return "📍 Live location";
       return message.content?.name ? `📍 ${message.content.name}` : "📍 Location";
     case "poll":
       return `📊 Poll: ${message.poll?.question || message.content || ""}`.trim();

@@ -1,6 +1,7 @@
 import { errorMessage } from "../api/client";
 import { callApi, chatApi, contactsApi, messageApi, statusApi } from "../api/endpoints";
 import { toast } from "../services/toast";
+import { resumeLiveLocations } from "../services/liveLocation";
 import { GIF_PREFIX, newClientId, normalizeRoom, attachmentKind, isGroupEvent, isSystemMessage, myPollVotes } from "../utils/messages";
 import { dispatch, getState } from "./store";
 
@@ -157,6 +158,7 @@ export async function bootstrap() {
   await Promise.allSettled([loadContacts(), loadRooms(), loadBlocked()]);
   loadStatus();
   loadCalls();
+  resumeLiveLocations();
 }
 
 /* ----------------------------------------------------------------------------
@@ -527,7 +529,7 @@ export async function sendLocation(roomId, location, { status = null } = {}) {
   try {
     const saved = await messageApi.send({ room: roomId, message_type: "LOCATION", content: location, client_message_id: draft.client_message_id, status_id: status?.id });
     settle(roomId, draft.client_message_id, saved);
-    return true;
+    return saved || true;
   } catch (error) {
     fail(roomId, draft.client_message_id, error);
     return false;

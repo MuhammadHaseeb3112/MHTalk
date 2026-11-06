@@ -1,5 +1,8 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ArrowLeft, Send, Sparkles } from "lucide-react";
+import { ArrowLeft, ClipboardPaste, Mic, Send, Smile, Sparkles, Square } from "lucide-react";
+import { toast } from "../../services/toast";
+import { readClipboardFiles } from "../../utils/clipboard";
+import EmojiPicker from "../conversation/EmojiPicker";
 import { useMediaQuery } from "../../hooks";
 import { clockTime } from "../../utils/format";
 import { IconButton } from "../common/ui";
@@ -35,8 +38,12 @@ export default function AssistantChat() {
   const compact = useMediaQuery("(max-width: 900px)");
   const { messages, sending, status } = useAssistant();
   const [text, setText] = useState("");
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [listening, setListening] = useState(false);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
+  const emojiBtnRef = useRef(null);
+  const speechRef = useRef(null);
 
   useEffect(() => {
     loadAssistantStatus();
@@ -49,6 +56,49 @@ export default function AssistantChat() {
   }, [messages.length, sending]);
 
   const disabled = status ? !status.enabled : false;
+
+  function insertText(value) {
+    const node = inputRef.current;
+    const start = node?.selectionStart ?? text.length;
+    const end = node?.selectionEnd ?? text.length;
+    setText(text.slice(0, start) + value + text.slice(end));
+    window.requestAnimationFrame(() => {
+      node?.focus();
+      node?.setSelectionRange(start + value.length, start + value.length);
+    });
+  }
+
+  async function paste() {
+    const result = await readClipboardFiles();
+    if (result.text) insertText(result.text);
+    else if (result.files.length) toast("MHTalk AI reads text only. Paste pictures in a chat instead.");
+    else toast(result.error || "Clipboard is empty.");
+  }
+
+  /** Voice typing (browser speech recognition), like the mic on the WhatsApp AI chat. */
+  function toggleDictation() {
+    if (listening) {
+      speechRef.current?.stop();
+      return;
+    }
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Recognition) {
+      toast("Voice typing isn't supported in this browser. Use the keyboard mic instead.");
+      return;
+    }
+    const recognition = new Recognition();
+    recognition.lang = navigator.language || "en-US";
+    recognition.interimResults = false;
+    recognition.onresult = (event) => {
+      const said = [...event.results].map((result) => result[0].transcript).join(" ").trim();
+      if (said) setText((current) => (current ? `${current} ${said}` : said));
+    };
+    recognition.onerror = () => toast("Couldn't hear you. Check microphone permission.");
+    recognition.onend = () => setListening(false);
+    speechRef.current = recognition;
+    setListening(true);
+    recognition.start();
+  }
 
   function submit(event) {
     event?.preventDefault();
@@ -109,26 +159,56 @@ export default function AssistantChat() {
       </div>
 
       <form className="composer assistant-composer" onSubmit={submit}>
+        {emojiOpen ? (
+          <EmojiPicker className="emoji-picker--composer" onPick={insertText} onClose={() => setEmojiOpen(false)} ignoreRefs={[emojiBtnRef]} />
+        ) : null}
         <div className="composer__row">
-        <div className="composer__pill">
-          <textarea
-            ref={inputRef}
-            className="composer__input"
-            rows={1}
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) submit(event);
-            }}
-            placeholder={disabled ? "MHTalk AI isn't set up yet" : "Ask MHTalk AI"}
-            aria-label="Ask MHTalk AI"
-            disabled={disabled}
-            maxLength={4000}
-          />
-          <button type="submit" className="send-btn" aria-label="Send to MHTalk AI" disabled={!text.trim() || sending || disabled}>
-            <Send size={20} />
-          </button>
-        </div>
+          <div className="composer__pill">
+            <button
+              ref={emojiBtnRef}
+              type="button"
+              className={`icon-btn ${emojiOpen ? "is-active" : ""}`}
+              aria-label="Emoji"
+              onClick={() => setEmojiOpen((value) => !value)}
+              disabled={disabled}
+            >
+              <Smile size={23} />
+            </button>
+            <textarea
+              ref={inputRef}
+              className="composer__input"
+              rows={1}
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) submit(event);
+              }}
+              placeholder={disabled ? "MHTalk AI isn't set up yet" : listening ? "Listening…" : "Ask MHTalk AI"}
+              aria-label="Ask MHTalk AI"
+              disabled={disabled}
+              maxLength={4000}
+            />
+            {!text.trim() ? (
+              <button type="button" className="icon-btn" aria-label="Paste from clipboard" onClick={paste} disabled={disabled}>
+                <ClipboardPaste size={21} />
+              </button>
+            ) : null}
+          </div>
+          {text.trim() ? (
+            <button type="submit" className="send-btn composer__action" aria-label="Send to MHTalk AI" disabled={sending || disabled}>
+              <Send size={22} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className={`send-btn composer__action ${listening ? "is-listening" : ""}`}
+              aria-label={listening ? "Stop voice typing" : "Voice typing"}
+              onClick={toggleDictation}
+              disabled={disabled}
+            >
+              {listening ? <Square size={18} /> : <Mic size={23} />}
+            </button>
+          )}
         </div>
       </form>
     </section>

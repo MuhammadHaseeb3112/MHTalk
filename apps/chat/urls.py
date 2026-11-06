@@ -56,6 +56,7 @@ from .views import (
 from .feature_views import (
     DisappearingMessagesAPIView,
     LinkPreviewAPIView,
+    LiveLocationAPIView,
     PollVoteAPIView,
     ViewOnceMediaAPIView,
 )
@@ -67,6 +68,7 @@ urlpatterns = [
     # Polls, disappearing messages, view once, link previews
     # ==========================
     path("messages/<int:message_id>/poll/vote/", PollVoteAPIView.as_view(), name="poll-vote"),
+    path("messages/<int:message_id>/live-location/", LiveLocationAPIView.as_view(), name="live-location"),
     path("messages/<int:message_id>/view-once/", ViewOnceMediaAPIView.as_view(), name="view-once-media"),
     path("rooms/<int:pk>/disappearing/", DisappearingMessagesAPIView.as_view(), name="room-disappearing"),
     path("link-preview/", LinkPreviewAPIView.as_view(), name="link-preview"),

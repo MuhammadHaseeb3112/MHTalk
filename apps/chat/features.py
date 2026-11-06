@@ -8,6 +8,7 @@ validates and broadcasts the same way.
 
 import json
 import math
+from datetime import timedelta
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
@@ -270,4 +271,28 @@ def validate_location_content(content):
     accuracy = content.get("accuracy")
     if isinstance(accuracy, (int, float)) and not isinstance(accuracy, bool) and math.isfinite(accuracy) and accuracy >= 0:
         clean["accuracy"] = round(float(accuracy), 1)
+    live_seconds = content.get("live_seconds")
+    if live_seconds is not None:
+        if isinstance(live_seconds, bool) or live_seconds not in LIVE_LOCATION_DURATIONS:
+            raise serializers.ValidationError({"content": "Share live location for 15 minutes, 1 hour or 8 hours."})
+        from django.utils import timezone
+
+        now = timezone.now()
+        clean["live"] = True
+        clean["live_until"] = (now + timedelta(seconds=live_seconds)).isoformat()
+        clean["updated_at"] = now.isoformat()
     return clean
+
+
+LIVE_LOCATION_DURATIONS = (15 * 60, 60 * 60, 8 * 60 * 60)
+
+
+def live_location_active(content):
+    """True while a live location message is still being shared."""
+    from django.utils import timezone
+    from django.utils.dateparse import parse_datetime
+
+    if not isinstance(content, dict) or not content.get("live") or content.get("stopped"):
+        return False
+    until = parse_datetime(str(content.get("live_until") or ""))
+    return bool(until and until > timezone.now())

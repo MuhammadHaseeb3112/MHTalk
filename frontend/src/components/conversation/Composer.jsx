@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, Camera, FileText, Headphones, Image as ImageIcon, MapPin, Mic, Paperclip, Pencil, Plus, Send, Smile, UserRound, X } from "lucide-react";
+import { BarChart3, Camera, FileText, Headphones, Image as ImageIcon, MapPin, Mic, ClipboardPaste, Paperclip, Pencil, Send, Smile, UserRound, X } from "lucide-react";
 import { chatApi, messageApi } from "../../api/endpoints";
 import { errorMessage } from "../../api/client";
 import { realtime } from "../../services/realtime";
@@ -11,6 +11,10 @@ import { previewText, attachmentKind, profileName, URL_PATTERN } from "../../uti
 import { openFilePicker } from "../../utils/files";
 import { formatPhone, phoneDigits } from "../../utils/phone";
 import { Avatar, Menu, Modal } from "../common/ui";
+import { useMediaQuery } from "../../hooks";
+import AttachSheet from "./AttachSheet";
+import { readClipboardFiles } from "../../utils/clipboard";
+import { startLiveLocation } from "../../services/liveLocation";
 import { LinkPreviewCard } from "../messages/FeatureCards";
 import EmojiPicker from "./EmojiPicker";
 import { LocationDialog, PollComposerDialog } from "./FeatureDialogs";
@@ -39,6 +43,8 @@ export default function Composer({ room, replyTo, editing, onClearReply, onClear
   const [text, setText] = useState(() => drafts.get(room.id) || "");
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [attachAnchor, setAttachAnchor] = useState(null);
+  const [attachSheet, setAttachSheet] = useState(false);
+  const isMobile = useMediaQuery("(max-width: 700px)");
   const [recording, setRecording] = useState(false); // false | "tap" | "hold"
   const [gesture, setGesture] = useState({ dx: 0, dy: 0, locked: false });
   const recorderControl = useRef(null);
@@ -356,14 +362,22 @@ export default function Composer({ room, replyTo, editing, onClearReply, onClear
     return <div className="composer composer--disabled">{disabledReason || "You blocked this contact. Unblock to send a message."}</div>;
   }
 
+  async function pasteFromClipboard() {
+    const result = await readClipboardFiles();
+    if (result.files.length) onPickFiles(result.files.slice(0, MAX_FILES), "media");
+    else if (result.text) insertEmoji(result.text);
+    else toast(result.error || "Clipboard is empty. Long-press the message box and choose Paste for text.");
+  }
+
   const attachItems = [
-    { label: "Document", icon: FileText, onClick: () => openFilePicker(fileIds.doc) },
-    { label: "Photos & videos", icon: ImageIcon, onClick: () => openFilePicker(fileIds.media) },
-    { label: "Camera", icon: Camera, onClick: onOpenCamera },
-    { label: "Audio", icon: Headphones, onClick: () => openFilePicker(fileIds.audio) },
-    { label: "Contact", icon: UserRound, onClick: () => setShareContact(true) },
-    { label: "Poll", icon: BarChart3, onClick: () => setPollOpen(true) },
-    { label: "Location", icon: MapPin, onClick: () => setLocationOpen(true) },
+    { label: "Gallery", icon: ImageIcon, tone: "gallery", onClick: () => openFilePicker(fileIds.media) },
+    { label: "Camera", icon: Camera, tone: "camera", onClick: () => onOpenCamera?.() },
+    { label: "Location", icon: MapPin, tone: "location", onClick: () => setLocationOpen(true) },
+    { label: "Contact", icon: UserRound, tone: "contact", onClick: () => setShareContact(true) },
+    { label: "Document", icon: FileText, tone: "document", onClick: () => openFilePicker(fileIds.doc) },
+    { label: "Poll", icon: BarChart3, tone: "poll", onClick: () => setPollOpen(true) },
+    { label: "Audio", icon: Headphones, tone: "audio", onClick: () => openFilePicker(fileIds.audio) },
+    { label: "Paste", icon: ClipboardPaste, tone: "paste", onClick: pasteFromClipboard },
   ];
 
   const bar = editing ? (
@@ -459,19 +473,10 @@ export default function Composer({ room, replyTo, editing, onClearReply, onClear
         <div className="composer__row">
           <div className="composer__pill">
             <button
-              type="button"
-              className={`icon-btn ${attachAnchor ? "is-active is-rotated" : ""}`}
-              aria-label="Attach"
-              onClick={(event) => setAttachAnchor(attachAnchor ? null : event.currentTarget)}
-              disabled={Boolean(editing)}
-            >
-              {attachAnchor ? <Plus size={24} /> : <Paperclip size={22} />}
-            </button>
-            <button
               ref={emojiBtnRef}
               type="button"
               className={`icon-btn ${emojiOpen ? "is-active" : ""}`}
-              aria-label="Emoji"
+              aria-label="Emoji, GIFs and stickers"
               onClick={() => setEmojiOpen((value) => !value)}
             >
               <Smile size={23} />
@@ -481,7 +486,7 @@ export default function Composer({ room, replyTo, editing, onClearReply, onClear
               className="composer__input"
               rows={1}
               value={text}
-              placeholder="Type a message"
+              placeholder="Message"
               aria-label="Type a message"
               onChange={onChange}
               onKeyDown={onKeyDown}
@@ -492,31 +497,49 @@ export default function Composer({ room, replyTo, editing, onClearReply, onClear
               }}
               maxLength={65000}
             />
-            {text.trim() ? (
-              <button type="button" className="send-btn" onClick={submit} aria-label={editing ? "Save edit" : "Send"}>
-                <Send size={22} />
+            <button
+              type="button"
+              className={`icon-btn ${attachAnchor || attachSheet ? "is-active" : ""}`}
+              aria-label="Attach"
+              onClick={(event) => {
+                if (isMobile) setAttachSheet(true);
+                else setAttachAnchor(attachAnchor ? null : event.currentTarget);
+              }}
+              disabled={Boolean(editing)}
+            >
+              <Paperclip size={22} className="composer__clip" />
+            </button>
+            {!text.trim() && onOpenCamera ? (
+              <button type="button" className="icon-btn" aria-label="Camera" onClick={onOpenCamera} disabled={Boolean(editing)}>
+                <Camera size={22} />
               </button>
-            ) : (
-              <button
-                type="button"
-                className="icon-btn composer__mic"
-                onPointerDown={onMicPointerDown}
-                onClick={(event) => {
-                  // Keyboard (Enter/Space) only: pointer taps are handled on pointerup.
-                  if (event.detail === 0) setRecording("tap");
-                }}
-                onContextMenu={(event) => event.preventDefault()}
-                aria-label="Record voice message"
-                data-tooltip="Click to record, or hold to talk"
-                disabled={Boolean(editing)}
-              >
-                <Mic size={23} />
-              </button>
-            )}
+            ) : null}
           </div>
+          {text.trim() ? (
+            <button type="button" className="send-btn composer__action" onClick={submit} aria-label={editing ? "Save edit" : "Send"}>
+              <Send size={22} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="send-btn composer__action composer__mic"
+              onPointerDown={onMicPointerDown}
+              onClick={(event) => {
+                // Keyboard (Enter/Space) only: pointer taps are handled on pointerup.
+                if (event.detail === 0) setRecording("tap");
+              }}
+              onContextMenu={(event) => event.preventDefault()}
+              aria-label="Record voice message"
+              data-tooltip="Click to record, or hold to talk"
+              disabled={Boolean(editing)}
+            >
+              <Mic size={23} />
+            </button>
+          )}
         </div>
       )}
-      {attachAnchor ? <Menu anchor={attachAnchor} items={attachItems} align="left" onClose={() => setAttachAnchor(null)} /> : null}
+      {attachAnchor ? <Menu anchor={attachAnchor} items={attachItems} align="right" onClose={() => setAttachAnchor(null)} /> : null}
+      {attachSheet ? <AttachSheet items={attachItems} onClose={() => setAttachSheet(false)} /> : null}
       <input id={fileIds.media} type="file" accept="image/*,video/*" multiple hidden onChange={handleFiles("media")} />
       <input id={fileIds.doc} type="file" multiple hidden onChange={handleFiles("document")} />
       <input id={fileIds.audio} type="file" accept="audio/*" multiple hidden onChange={handleFiles("audio")} />
@@ -535,7 +558,9 @@ export default function Composer({ room, replyTo, editing, onClearReply, onClear
           onClose={() => setLocationOpen(false)}
           onSend={(location) => {
             setLocationOpen(false);
-            sendLocation(room.id, location);
+            sendLocation(room.id, location).then((saved) => {
+              if (location.live_seconds && saved?.id) startLiveLocation(room.id, saved);
+            });
           }}
         />
       ) : null}

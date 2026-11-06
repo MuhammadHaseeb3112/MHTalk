@@ -184,7 +184,7 @@ def _message_text(message):
             return f"🎵 {name or 'Audio'}"
         return f"📄 {name or 'Document'}"
     if message.message_type == MessageType.LOCATION:
-        return "📍 Location"
+        return "📍 Live location" if '"live": true' in (message.content or "") else "📍 Location"
     if message.message_type == MessageType.CONTACT:
         return "👤 Contact"
     if message.message_type == MessageType.STICKER:

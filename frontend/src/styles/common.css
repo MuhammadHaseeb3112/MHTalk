@@ -105,6 +105,7 @@
   inset: 0;
   z-index: 2900;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   place-items: center;
   padding: 16px;
   background: var(--overlay);
@@ -553,4 +554,29 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+/* Phones: dialogs open as a bottom sheet across the full width (WhatsApp). */
+@media (max-width: 600px) {
+  .modal-backdrop {
+    align-items: end;
+    padding: 0;
+  }
+  .modal {
+    width: 100% !important;
+    max-width: 100%;
+    max-height: 92dvh;
+    border-radius: 20px 20px 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    animation: sheet-in 0.2s ease-out;
+  }
+  .modal__body {
+    overflow-y: auto;
+  }
+}
+@keyframes sheet-in {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
 }

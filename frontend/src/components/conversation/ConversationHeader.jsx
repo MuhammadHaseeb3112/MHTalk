@@ -29,6 +29,7 @@ import { useStore } from "../../store/store";
 import { lastSeenLabel } from "../../utils/format";
 import { contactsByUser, disappearingLabel, displayUserName } from "../../utils/messages";
 import { Avatar, IconButton, MenuButton } from "../common/ui";
+import { ringFor, useStatusGroup } from "../status/statusRing";
 import { requestJoinCall } from "../calls/groupCall";
 import { askBlock, askClearChat, askDeleteChat, askExitGroup, askMute } from "../chat-list/roomMenu";
 import { typingLabel } from "../chat-list/useChatList";
@@ -100,13 +101,14 @@ function ConversationHeader({ room, title, onOpenInfo, onSearch, onSelect, onClo
   ].filter(Boolean);
 
   const photo = room.isGroup ? room.groupPhoto : room.otherUser?.profile?.profile_picture;
+  const statusGroup = useStatusGroup(room.isGroup ? null : room.otherUser?.id);
 
   return (
     <header className="conv-header">
       {compact ? <IconButton icon={ArrowLeft} label="Back to chats" onClick={onClose} /> : null}
       <button type="button" className="conv-header__who" onClick={onOpenInfo} aria-label={`${title} info`}>
         <span className="avatar-wrap">
-          <Avatar src={photo} name={title} group={room.isGroup} size={40} />
+          <Avatar src={photo} name={title} group={room.isGroup} size={40} ring={ringFor(statusGroup)} />
           {room.disappearingSeconds ? (
             <span className="avatar-timer avatar-timer--sm" title={`Disappearing messages: ${disappearingLabel(room.disappearingSeconds)}`}>
               <Timer size={10} strokeWidth={2.6} />

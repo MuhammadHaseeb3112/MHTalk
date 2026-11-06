@@ -25,6 +25,7 @@ import MessageList from "./MessageList";
 import PinnedBar from "./PinnedBar";
 import ReactionPicker from "./ReactionPicker";
 import { DeleteMessagesDialog, ForwardDialog, ReactionsDialog } from "./dialogs";
+import { confirmAction } from "../common/dialogs";
 import { DisappearingDialog, PollVotesDialog, ViewOnceViewer } from "./FeatureDialogs";
 import StatusViewer from "../status/StatusViewer";
 
@@ -251,9 +252,18 @@ export default function Conversation({ roomId }) {
           }
           break;
         }
-        case "call":
-          calls.startCall(room, payload.type);
+        case "call": {
+          // Tapping a call card asks first, and calls back the same way
+          // (voice for a voice call, video for a video call), like WhatsApp.
+          const video = payload.type === "video";
+          confirmAction({
+            title: `${video ? "Video" : "Voice"} call ${title}?`,
+            message: room?.isGroup ? "Everyone in the group will be called." : "",
+            confirmLabel: video ? "Video call" : "Call",
+            onConfirm: () => calls.startCall(room, payload.type),
+          });
           break;
+        }
         case "contact":
           handleContactCard(message, payload);
           break;
@@ -294,7 +304,7 @@ export default function Conversation({ roomId }) {
           break;
       }
     },
-    [openMedia, roomId, calls, room, handleContactCard, isMember, me.id, app, selectedIds, pressSelect],
+    [openMedia, roomId, calls, room, handleContactCard, isMember, me.id, app, selectedIds, pressSelect, title],
   );
 
   function messageMenuItems(message) {

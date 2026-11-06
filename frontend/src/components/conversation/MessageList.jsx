@@ -30,6 +30,29 @@ export default function MessageList({ room, me, contactMap, selectMode, selected
   const [showJump, setShowJump] = useState(false);
   const [newWhileAway, setNewWhileAway] = useState(0);
   const [highlightId, setHighlightId] = useState(null);
+  // While a "go to message" jump settles (images loading, older pages
+  // arriving) keep that message in view instead of snapping to the bottom.
+  const jumpTargetRef = useRef(null); // { id, until }
+  const centerOn = useCallback((messageId) => {
+    const container = scrollRef.current;
+    const node = container?.querySelector(`[data-message-id="${messageId}"]`);
+    if (!node) return false;
+    const offset = node.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop;
+    const room = container.clientHeight - 24;
+    // Tall messages: show their start; short ones: centre them.
+    const top = node.offsetHeight > room ? offset - 12 : offset - container.clientHeight / 2 + node.offsetHeight / 2;
+    container.scrollTop = Math.max(0, top);
+    return true;
+  }, []);
+  const stopJumpFollow = useCallback(() => {
+    jumpTargetRef.current = null;
+  }, []);
+  const activeJump = () => {
+    const target = jumpTargetRef.current;
+    if (target && Date.now() < target.until) return target;
+    jumpTargetRef.current = null;
+    return null;
+  };
   // Decide once where the unread divider goes (first unread incoming message).
   const computeMarker = () => {
     if (!(initialUnread > 0)) return null;
@@ -95,14 +118,18 @@ export default function MessageList({ room, me, contactMap, selectMode, selected
       const height = inner.offsetHeight;
       const grew = height > lastHeight;
       lastHeight = height;
-      if (grew && positionedRef.current && nearBottomRef.current && !node.querySelector(".unread-divider")) {
+      const target = activeJump();
+      if (target) {
+        nearBottomRef.current = false;
+        centerOn(target.id);
+      } else if (grew && positionedRef.current && nearBottomRef.current && !node.querySelector(".unread-divider")) {
         node.scrollTop = node.scrollHeight;
       }
       prevHeightRef.current = node.scrollHeight;
     });
     observer.observe(inner);
     return () => observer.disconnect();
-  }, []);
+  }, [centerOn]);
 
   // Keep position when older messages are prepended; follow new ones at the bottom.
   useLayoutEffect(() => {
@@ -110,7 +137,10 @@ export default function MessageList({ room, me, contactMap, selectMode, selected
     if (!node || !positionedRef.current) return;
     const firstId = items[0]?.id ?? items[0]?.client_message_id;
     const prepended = prevFirstIdRef.current && firstId !== prevFirstIdRef.current && items.length > prevCountRef.current;
-    if (prepended) {
+    const target = activeJump();
+    if (target) {
+      centerOn(target.id);
+    } else if (prepended) {
       node.scrollTop += node.scrollHeight - prevHeightRef.current;
     } else if (items.length > prevCountRef.current) {
       const last = items[items.length - 1];
@@ -121,13 +151,13 @@ export default function MessageList({ room, me, contactMap, selectMode, selected
     prevHeightRef.current = node.scrollHeight;
     prevFirstIdRef.current = firstId;
     prevCountRef.current = items.length;
-  }, [items, me.id, scrollToBottom]);
+  }, [items, me.id, scrollToBottom, centerOn]);
 
   const onScroll = useCallback(() => {
     const node = scrollRef.current;
     if (!node) return;
     const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
-    nearBottomRef.current = distance < 120;
+    nearBottomRef.current = distance < 120 && !activeJump();
     setShowJump(distance > 400);
     if (distance < 120) setNewWhileAway(0);
     if (node.scrollTop < 300) {
@@ -147,12 +177,11 @@ export default function MessageList({ room, me, contactMap, selectMode, selected
         for (let attempt = 0; attempt < 120; attempt += 1) {
           const container = scrollRef.current;
           if (!container) return;
-          const node = container.querySelector(`[data-message-id="${messageId}"]`);
-          if (node) {
+          if (container.querySelector(`[data-message-id="${messageId}"]`)) {
             nearBottomRef.current = false;
-            const top =
-              node.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop - container.clientHeight / 2 + node.offsetHeight / 2;
-            container.scrollTo({ top: Math.max(0, top), behavior: attempt === 0 ? "smooth" : "auto" });
+            jumpTargetRef.current = { id: messageId, until: Date.now() + 2500 };
+            centerOn(messageId);
+            window.requestAnimationFrame(() => centerOn(messageId));
             setHighlightId(messageId);
             window.setTimeout(() => setHighlightId(null), 2200);
             return;
@@ -173,7 +202,7 @@ export default function MessageList({ room, me, contactMap, selectMode, selected
         jumpingRef.current = false;
       }
     },
-    [room.id],
+    [room.id, centerOn],
   );
 
   useEffect(() => {
@@ -223,7 +252,7 @@ export default function MessageList({ room, me, contactMap, selectMode, selected
   }, [items, unreadMarker]);
 
   return (
-    <div className="messages" ref={scrollRef} onScroll={onScroll}>
+    <div className="messages" ref={scrollRef} onScroll={onScroll} onWheel={stopJumpFollow} onTouchStart={stopJumpFollow}>
       <div className="messages__inner">
         {state.loading && state.loaded ? (
           <div className="messages__older"><Spinner size={20} /></div>

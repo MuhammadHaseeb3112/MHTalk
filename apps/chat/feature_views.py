@@ -3,11 +3,13 @@ REST endpoints for polls, disappearing messages, view once media and link
 previews. Every endpoint checks chat membership first.
 """
 
+import json
 import mimetypes
 
 from django.db import IntegrityError, transaction
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -20,7 +22,9 @@ from .features import (
     broadcast_message_patch,
     can_change_disappearing,
     cast_poll_vote,
+    live_location_active,
     set_disappearing_timer,
+    validate_location_content,
 )
 from .link_preview import extract_first_url, get_link_preview
 from .models import ChatRoom, DeletedMessage, Message, Participant, ViewOnceOpen
@@ -71,6 +75,65 @@ class PollVoteAPIView(APIView):
         poll = cast_poll_vote(message, request.user, option_ids)
         broadcast_message_patch(message.room_id, message.id, {"poll": poll})
         return Response({"message_id": message.id, "poll": poll})
+
+
+class LiveLocationAPIView(APIView):
+    """
+    The sender of a live location moves it (``{"latitude", "longitude",
+    "accuracy"?}``) or stops sharing (``{"stop": true}``). Everyone in the
+    chat gets the new position live (``patch`` socket event).
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Update or stop a live location",
+        request={
+            "type": "object",
+            "properties": {
+                "latitude": {"type": "number"},
+                "longitude": {"type": "number"},
+                "accuracy": {"type": "number"},
+                "stop": {"type": "boolean"},
+            },
+        },
+        tags=["Chat"],
+    )
+    def post(self, request, message_id):
+        message = _member_message(request, message_id)
+        if message.message_type != MessageType.LOCATION or message.is_deleted:
+            return Response({"detail": "This message is not a location."}, status=status.HTTP_400_BAD_REQUEST)
+        if message.sender_id != request.user.id:
+            return Response({"detail": "Only the sender can update a live location."}, status=status.HTTP_403_FORBIDDEN)
+        with transaction.atomic():
+            message = Message.objects.select_for_update().get(pk=message.pk)
+            try:
+                content = json.loads(message.content or "{}")
+            except ValueError:
+                content = {}
+            if not isinstance(content, dict) or not content.get("live"):
+                return Response({"detail": "This location is not live."}, status=status.HTTP_400_BAD_REQUEST)
+            if request.data.get("stop") is True:
+                content["stopped"] = True
+                content["live_until"] = timezone.now().isoformat()
+            else:
+                if not live_location_active(content):
+                    return Response({"detail": "Live location has ended."}, status=status.HTTP_400_BAD_REQUEST)
+                moved = validate_location_content(
+                    {
+                        "latitude": request.data.get("latitude"),
+                        "longitude": request.data.get("longitude"),
+                        "accuracy": request.data.get("accuracy"),
+                    }
+                )
+                content.update({key: moved[key] for key in ("latitude", "longitude")})
+                if "accuracy" in moved:
+                    content["accuracy"] = moved["accuracy"]
+            content["updated_at"] = timezone.now().isoformat()
+            message.content = json.dumps(content)
+            message.save(update_fields=["content"])
+        broadcast_message_patch(message.room_id, message.id, {"content": content}, inbox_user_ids=[request.user.id])
+        return Response({"message_id": message.id, "content": content})
 
 
 class DisappearingMessagesAPIView(APIView):

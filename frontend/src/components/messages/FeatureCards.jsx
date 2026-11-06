@@ -1,5 +1,7 @@
-import { useState } from "react";
-import { CheckCheck, ListChecks, MapPin } from "lucide-react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { CheckCheck, ListChecks, MapPin, Radio } from "lucide-react";
+import { isSharingLive, stopLiveLocation, subscribeLiveLocation } from "../../services/liveLocation";
+import { clockTime } from "../../utils/format";
 import { googleMapsUrl, myPollVotes, osmTilePoint, viewOnceState } from "../../utils/messages";
 import { Avatar } from "../common/ui";
 
@@ -157,12 +159,62 @@ export function MapPreview({ latitude, longitude, width = 270, height = 150, zoo
   );
 }
 
-export function LocationCard({ content }) {
+/** Current time, refreshed every 30 s while ``active`` (for "Live until"). */
+function useClock(active) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return undefined;
+    const timer = window.setInterval(() => setNow(Date.now()), 30000);
+    return () => window.clearInterval(timer);
+  }, [active]);
+  return now;
+}
+
+function LiveLocationFooter({ card, messageId, mine }) {
+  const until = Date.parse(card.live_until || "");
+  const now = useClock(!card.stopped);
+  const sharingHere = useSyncExternalStore(subscribeLiveLocation, () => isSharingLive(messageId));
+  const active = !card.stopped && Number.isFinite(until) && until > now;
+  return (
+    <span className="location-card__live">
+      <span className={`location-card__live-icon ${active ? "is-active" : ""}`}><Radio size={16} /></span>
+      <span className="location-card__live-text">
+        <strong>{active ? "Live location" : "Live location ended"}</strong>
+        <small>{active ? `Live until ${clockTime(card.live_until)}` : card.updated_at ? `Last updated ${clockTime(card.updated_at)}` : ""}</small>
+      </span>
+      {mine && active ? (
+        <button
+          type="button"
+          className="location-card__stop"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            stopLiveLocation(messageId);
+          }}
+        >
+          {sharingHere ? "Stop sharing" : "Stop"}
+        </button>
+      ) : null}
+    </span>
+  );
+}
+
+export function LocationCard({ content, messageId, mine = false }) {
   const card = content && typeof content === "object" ? content : {};
   const latitude = Number(card.latitude);
   const longitude = Number(card.longitude);
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return <span className="bubble__text">📍 Location</span>;
   const url = googleMapsUrl(latitude, longitude);
+  if (card.live) {
+    return (
+      <span className="location-card location-card--live">
+        <a href={url} target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} aria-label="Open live location in Google Maps">
+          <MapPreview latitude={latitude} longitude={longitude} />
+        </a>
+        <LiveLocationFooter card={card} messageId={messageId} mine={mine} />
+      </span>
+    );
+  }
   return (
     <a className="location-card" href={url} target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} aria-label="Open location in Google Maps">
       <MapPreview latitude={latitude} longitude={longitude} />

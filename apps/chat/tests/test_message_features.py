@@ -774,6 +774,26 @@ class LocationTests(TestCase):
             response = send(self.client_a, self.room, message_type="LOCATION", content=content)
             self.assertEqual(response.status_code, 400, content)
 
+    def test_live_location_update_and_stop(self):
+        response = send(self.client_a, self.room, message_type="LOCATION", content={"latitude": 24.86, "longitude": 67.0, "live_seconds": 900})
+        self.assertEqual(response.status_code, 201, response.content)
+        data = response.data["data"]
+        self.assertTrue(data["content"]["live"])
+        url = f"/api/chat/messages/{data['id']}/live-location/"
+        moved = self.client_a.post(url, {"latitude": 24.87, "longitude": 67.01, "accuracy": 5}, format="json")
+        self.assertEqual(moved.status_code, 200, moved.content)
+        self.assertEqual(moved.data["content"]["latitude"], 24.87)
+        other = client_for(self.bob).post(url, {"latitude": 1, "longitude": 1}, format="json")
+        self.assertEqual(other.status_code, 403)
+        stopped = self.client_a.post(url, {"stop": True}, format="json")
+        self.assertTrue(stopped.data["content"]["stopped"])
+        after = self.client_a.post(url, {"latitude": 24.9, "longitude": 67.0}, format="json")
+        self.assertEqual(after.status_code, 400)
+
+    def test_live_location_bad_duration(self):
+        response = send(self.client_a, self.room, message_type="LOCATION", content={"latitude": 1, "longitude": 1, "live_seconds": 5})
+        self.assertEqual(response.status_code, 400)
+
 
 def tearDownModule():
     shutil.rmtree(TEST_MEDIA, ignore_errors=True)

@@ -210,7 +210,7 @@ export default function StatusReplyBar({ status, owner, onPause, onResume }) {
       <input ref={docRef} type="file" multiple hidden onChange={pickFiles("document")} />
       <input ref={audioRef} type="file" accept="audio/*" multiple hidden onChange={pickFiles("audio")} />
       {locating ? (
-        <LocationDialog
+        <LocationDialog allowLive={false}
           onClose={() => {
             setLocating(false);
             onResume();
