@@ -50,6 +50,8 @@ export default function mhtalkServiceWorker() {
         .replace('"__MHTALK_SW_VERSION__"', JSON.stringify(version))
         .replace("[/* __MHTALK_SW_PRECACHE__ */]", JSON.stringify(precache, null, 2));
       writeFileSync(resolve(outDir, "sw.js"), source);
+      // "App update" in Settings reads this to tell the user what's new.
+      writeFileSync(resolve(outDir, "release-notes.json"), readFileSync(resolve(here, "../src/releaseNotes.json"), "utf8"));
     },
   };
 }

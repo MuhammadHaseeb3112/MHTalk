@@ -256,3 +256,35 @@ class StatusReplyAnyMessageTests(TestCase):
         r = self.client.get("/api/chat/stickers/recent/")
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.data["results"], [])
+
+
+class VideoTrimTests(TestCase):
+    def test_trim_cuts_video_with_ffmpeg(self):
+        import shutil
+        import subprocess
+        import tempfile
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        from apps.chat.video_trim import trim_upload
+
+        if not shutil.which("ffmpeg"):
+            self.skipTest("ffmpeg not installed")
+        with tempfile.TemporaryDirectory() as folder:
+            path = f"{folder}/clip.mp4"
+            subprocess.run(
+                ["ffmpeg", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=160x120:rate=10", "-t", "6", "-g", "10", "-pix_fmt", "yuv420p", path],
+                check=True,
+            )
+            with open(path, "rb") as handle:
+                upload = SimpleUploadedFile("clip.mp4", handle.read(), content_type="video/mp4")
+            trimmed = trim_upload(upload, 2, 4)
+            self.assertIsNot(trimmed, upload)
+            out = f"{folder}/out.mp4"
+            with open(out, "wb") as handle:
+                handle.write(trimmed.read())
+            probe = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", out],
+                capture_output=True, text=True, check=True,
+            )
+            self.assertLess(float(probe.stdout.strip()), 3.5)

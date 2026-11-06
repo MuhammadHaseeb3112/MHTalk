@@ -133,6 +133,13 @@ export default function MainLayout({ onLogout }) {
     setDrawer(null);
   }, []);
 
+  // "What's new" on the update toast → Settings → App update.
+  useEffect(() => {
+    const handler = () => setSection("settings");
+    window.addEventListener("mhtalk:open-update", handler);
+    return () => window.removeEventListener("mhtalk:open-update", handler);
+  }, [setSection]);
+
   // Desktop notifications deep-link into a chat.
   useEffect(() => {
     const handler = (event) => openRoom(Number(event.detail));

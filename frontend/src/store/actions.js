@@ -394,7 +394,7 @@ export function sendSticker(roomId, file, replyTo, { status = null } = {}) {
 }
 
 /** Upload one file as its own message (WhatsApp sends each media separately). */
-export async function sendFile(roomId, file, { caption = "", replyTo, viewOnce = false, mentions = [], messageType = null, status = null } = {}) {
+export async function sendFile(roomId, file, { caption = "", replyTo, viewOnce = false, mentions = [], messageType = null, status = null, trim = null } = {}) {
   const previewUrl = URL.createObjectURL(file);
   const type = messageType || messageTypeForFile(file);
   const draft = optimistic(roomId, {
@@ -420,6 +420,8 @@ export async function sendFile(roomId, file, { caption = "", replyTo, viewOnce =
         view_once: viewOnce,
         mentions,
         status_id: status?.id,
+        trim_start: trim ? trim.start.toFixed(2) : undefined,
+        trim_end: trim ? trim.end.toFixed(2) : undefined,
       },
       (event) => {
         if (!event.total) return;

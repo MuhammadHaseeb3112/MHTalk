@@ -10,6 +10,8 @@ import { IconButton } from "../common/ui";
 import EmojiPicker from "../conversation/EmojiPicker";
 import { ViewOnceIcon } from "../messages/FeatureCards";
 import ImageEditor from "./ImageEditor";
+import VideoTrimmer from "./VideoTrimmer";
+import { useTrimLoop } from "./useTrimLoop";
 
 const MAX_ITEMS = 30;
 
@@ -73,6 +75,8 @@ export default function MediaComposer({ initialFiles, mode, title, onSend, onClo
   }, [items.length, onClose]);
 
   const current = items[Math.min(active, items.length - 1)];
+  const videoRef = useRef(null);
+  useTrimLoop(videoRef, current?.kind === "video" ? current.trim : null);
   const accept = mode === "media" ? "image/*,video/*" : mode === "audio" ? "audio/*" : undefined;
 
   function remove(id) {
@@ -187,6 +191,8 @@ export default function MediaComposer({ initialFiles, mode, title, onSend, onClo
           file: item.kind === "image" ? await preparePhoto(item) : item.file,
           caption: item.caption.trim(),
           viewOnce: item.viewOnce && (item.kind === "image" || item.kind === "video"),
+          // Only send a trim when the user actually shortened the video.
+          trim: item.kind === "video" && item.trim && item.duration && (item.trim.start > 0.05 || item.trim.end < item.duration - 0.05) ? item.trim : null,
         })),
       );
       onSend(prepared);
@@ -274,13 +280,26 @@ export default function MediaComposer({ initialFiles, mode, title, onSend, onClo
         </div>
       ) : null}
 
+      {current?.kind === "video" && current.duration ? (
+        <VideoTrimmer url={current.url} duration={current.duration} value={current.trim} onChange={(trim) => patchCurrent({ trim })} sizeBytes={current.file.size} />
+      ) : null}
       <div className="media-composer__preview">
         {isPhoto ? (
           <MarkupCanvas key={current.id} url={current.url} alt={current.file.name} ops={current.ops} tool={tool} color={color} onChange={setOps} />
         ) : current.kind === "image" ? (
           <img src={current.url} alt={current.file.name} />
         ) : current.kind === "video" ? (
-          <video key={current.url} src={current.url} controls playsInline />
+          <video
+            key={current.url}
+            ref={videoRef}
+            src={current.url}
+            controls
+            playsInline
+            onLoadedMetadata={(event) => {
+              const total = event.currentTarget.duration;
+              if (Number.isFinite(total) && !current.duration) patchCurrent({ duration: total, trim: { start: 0, end: total } });
+            }}
+          />
         ) : (
           <div className="media-composer__file">
             {current.kind === "audio" ? <Headphones size={64} /> : <FileText size={64} />}

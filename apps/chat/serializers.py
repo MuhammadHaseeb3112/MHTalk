@@ -1070,6 +1070,10 @@ class UploadMessageSerializer(serializers.Serializer):
 
     file = serializers.FileField()
 
+    # Videos: keep only this part (seconds), cut on the server.
+    trim_start = serializers.FloatField(required=False, min_value=0, write_only=True)
+    trim_end = serializers.FloatField(required=False, min_value=0, write_only=True)
+
     view_once = serializers.BooleanField(
         required=False,
         default=False,
@@ -1153,6 +1157,11 @@ class UploadMessageSerializer(serializers.Serializer):
             raise serializers.ValidationError({"message_type": "Use IMAGE, VIDEO, DOCUMENT or STICKER for uploads."})
         if attrs.get("view_once") and message_type not in (MessageType.IMAGE, MessageType.VIDEO):
             raise serializers.ValidationError({"view_once": "Only photos and videos can be sent as view once."})
+        trim_start, trim_end = attrs.pop("trim_start", None), attrs.pop("trim_end", None)
+        if message_type == MessageType.VIDEO and trim_end is not None:
+            from .video_trim import trim_upload
+
+            attrs["file"] = trim_upload(upload, trim_start or 0, trim_end)
 
         from .features import validate_mentions
 

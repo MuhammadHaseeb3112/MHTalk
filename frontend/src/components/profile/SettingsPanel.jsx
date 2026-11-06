@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Volume2, Bell, ChevronRight, CircleHelp, Download, Keyboard, KeyRound, Lock, LogOut, MessageSquareText, Palette, Search, Share, SquarePlus, UserX } from "lucide-react";
+import { Volume2, Bell, ChevronRight, CircleHelp, Download, Keyboard, KeyRound, Lock, LogOut, MessageSquareText, Palette, Search, Share, SquarePlus, UserX, RefreshCw } from "lucide-react";
 import { useStore } from "../../store/store";
 import { loadBlocked, setBlocked } from "../../store/actions";
 import { getNotificationPrefs, requestDesktopPermission, setNotificationPrefs } from "../../services/notify";
@@ -14,6 +14,8 @@ import { Avatar, EmptyState, Modal, PanelHeader, SearchInput, Toggle } from "../
 import { confirmAction } from "../common/dialogs";
 import { useApp } from "../layout/AppContext";
 import { AccountView, PrivacyView } from "./PrivacySettings";
+import AppUpdateView from "./AppUpdateView";
+import { APP_VERSION, takeOpenUpdate, useAppUpdate } from "../../services/appUpdate";
 
 const SHORTCUTS = [
   ["New chat", "Ctrl + Alt + N"],
@@ -25,10 +27,13 @@ const SHORTCUTS = [
   ["Pause status", "Space"],
 ];
 
-function SettingRow({ icon: Icon, title, subtitle, onClick, danger }) {
+function SettingRow({ icon: Icon, title, subtitle, onClick, danger, dot }) {
   return (
     <button type="button" className={`settings-row ${danger ? "is-danger" : ""}`} onClick={onClick}>
-      <Icon size={22} />
+      <span className="settings-row__icon">
+        <Icon size={22} />
+        {dot ? <span className="settings-row__dot" aria-label="New" /> : null}
+      </span>
       <span className="settings-row__body">
         <span className="settings-row__title">{title}</span>
         {subtitle ? <span className="settings-row__subtitle">{subtitle}</span> : null}
@@ -153,7 +158,17 @@ export default function SettingsPanel() {
   const app = useApp();
   const me = useStore((state) => state.me);
   const blockedCount = useStore((state) => state.blocked.length);
-  const [view, setView] = useState("main");
+  // Opened from the "new version" toast → straight to App update.
+  const [view, setView] = useState(() => (takeOpenUpdate() ? "update" : "main"));
+  const appUpdate = useAppUpdate();
+  useEffect(() => {
+    const open = () => {
+      takeOpenUpdate();
+      setView("update");
+    };
+    window.addEventListener("mhtalk:open-update", open);
+    return () => window.removeEventListener("mhtalk:open-update", open);
+  }, []);
   const [prefs, setPrefs] = useState(getNotificationPrefs);
   const [query, setQuery] = useState("");
   const [modal, setModal] = useState(null);
@@ -266,6 +281,10 @@ export default function SettingsPanel() {
     );
   }
 
+  if (view === "update") {
+    return <AppUpdateView onBack={() => setView("main")} />;
+  }
+
   if (view === "chats") {
     return (
       <section className="panel">
@@ -297,6 +316,14 @@ export default function SettingsPanel() {
       ? { key: "install", icon: Download, title: "Install app", subtitle: install.ios ? "Add MHTalk to your Home Screen" : "Use MHTalk like a native app", onClick: onInstall }
       : null,
     { key: "shortcuts", icon: Keyboard, title: "Keyboard shortcuts", subtitle: "Quick actions", onClick: () => setModal("shortcuts") },
+    {
+      key: "update",
+      icon: RefreshCw,
+      title: "App update",
+      subtitle: appUpdate.available ? "New version available — see what's new" : `Version ${APP_VERSION} · up to date`,
+      dot: appUpdate.available,
+      onClick: () => setView("update"),
+    },
     { key: "help", icon: CircleHelp, title: "Help", subtitle: "About MHTalk", onClick: () => setModal("help") },
   ].filter((row) => row && (!query || `${row.title} ${row.subtitle}`.toLowerCase().includes(query.toLowerCase())));
 
@@ -313,7 +340,7 @@ export default function SettingsPanel() {
           </span>
         </button>
         {rows.map((row) => (
-          <SettingRow key={row.key} icon={row.icon} title={row.title} subtitle={row.subtitle} onClick={row.onClick} />
+          <SettingRow key={row.key} icon={row.icon} title={row.title} subtitle={row.subtitle} dot={row.dot} onClick={row.onClick} />
         ))}
         {!rows.length ? <EmptyState icon={Search} text="No settings found" /> : null}
         <SettingRow

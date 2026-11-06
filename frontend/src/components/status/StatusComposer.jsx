@@ -1,6 +1,6 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Crop, Lock, Palette, Send, Smile, Type, X } from "lucide-react";
+import { ChevronRight, CircleDashed, Crop, Palette, Send, Smile, Type, X } from "lucide-react";
 import { errorMessage } from "../../api/client";
 import { statusApi } from "../../api/endpoints";
 import { useObjectUrl } from "../../hooks";
@@ -12,6 +12,8 @@ import EmojiPicker from "../conversation/EmojiPicker";
 import ImageEditor from "../media/ImageEditor";
 import { getStatusPrivacy, setStatusPrivacy, STATUS_COLORS } from "./statusPrefs";
 import StatusPrivacyEditor from "./StatusPrivacyEditor";
+import VideoTrimmer from "../media/VideoTrimmer";
+import { useTrimLoop } from "../media/useTrimLoop";
 
 const FONTS = ["inherit", "Georgia, serif", "'Courier New', monospace", "'Trebuchet MS', sans-serif"];
 const LABELS = { CONTACTS: "My contacts", CONTACTS_EXCEPT: "My contacts except…", ONLY_SHARE_WITH: "Only share with…", EVERYONE: "Everyone" };
@@ -36,6 +38,20 @@ export default function StatusComposer({ initialFile, mode = "text", onClose }) 
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const isText = mode === "text" && !file;
   const isVideo = file?.type.startsWith("video/");
+  // Video: pick the part to post (WhatsApp keeps status videos to 60 s).
+  const videoRef = useRef(null);
+  const [duration, setDuration] = useState(0);
+  const [trim, setTrim] = useState(null);
+  const loopTrim = useMemo(() => (trim ? { start: trim.start, end: trim.end } : null), [trim]);
+  useTrimLoop(videoRef, loopTrim);
+  const trimmed = Boolean(trim && duration && (trim.start > 0.05 || trim.end < duration - 0.05));
+
+  const audienceLabel =
+    privacy.visibility === "ONLY_SHARE_WITH"
+      ? `${privacy.users.length} included`
+      : privacy.visibility === "CONTACTS_EXCEPT"
+        ? `${privacy.users.length} excluded`
+        : LABELS[privacy.visibility];
 
   async function publish() {
     if (isText && !text.trim()) {
@@ -56,6 +72,8 @@ export default function StatusComposer({ initialFile, mode = "text", onClose }) 
           background_color: color,
           text_color: "#FFFFFF",
           visibility: privacy.visibility,
+          trim_start: isVideo && trimmed ? trim.start.toFixed(2) : undefined,
+          trim_end: isVideo && trimmed ? trim.end.toFixed(2) : undefined,
           users: ["CONTACTS_EXCEPT", "ONLY_SHARE_WITH"].includes(privacy.visibility) ? privacy.users : undefined,
         },
         (event) => event.total && setProgress(Math.round((event.loaded / event.total) * 100)),
@@ -102,6 +120,9 @@ export default function StatusComposer({ initialFile, mode = "text", onClose }) 
           </div>
         ) : null}
       </div>
+      {isVideo && duration ? (
+        <VideoTrimmer url={url} duration={duration} value={trim} onChange={setTrim} maxLength={60} sizeBytes={file.size} />
+      ) : null}
       <div className="status-composer__stage">
         {isText ? (
           <textarea
@@ -114,7 +135,23 @@ export default function StatusComposer({ initialFile, mode = "text", onClose }) 
             autoFocus
           />
         ) : file ? (
-          isVideo ? <video src={url} controls playsInline /> : <img src={url} alt="Status preview" />
+          isVideo ? (
+            <video
+              ref={videoRef}
+              src={url}
+              controls
+              playsInline
+              autoPlay
+              onLoadedMetadata={(event) => {
+                const total = event.currentTarget.duration;
+                if (!Number.isFinite(total)) return;
+                setDuration(total);
+                setTrim({ start: 0, end: Math.min(total, 60) });
+              }}
+            />
+          ) : (
+            <img src={url} alt="Status preview" />
+          )
         ) : null}
         {emojiOpen ? <EmojiPicker className="emoji-picker--status" ignoreRefs={[emojiRef]} onClose={() => setEmojiOpen(false)} onPick={(emoji) => setText((value) => value + emoji)} /> : null}
       </div>
@@ -144,16 +181,20 @@ export default function StatusComposer({ initialFile, mode = "text", onClose }) 
         ) : (
           <span className="status-composer__count">{700 - text.length}</span>
         )}
-        <button type="button" className="status-composer__privacy" onClick={() => setPrivacyOpen(true)} title="Choose who can see this status">
-          <Lock size={13} /> {LABELS[privacy.visibility]}
-        </button>
-        <button type="button" className="fab" onClick={publish} disabled={busy} aria-label="Post status">
-          {busy ? <span className="fab__progress">{progress ? `${progress}%` : <Spinner size={18} className="spinner--dark" />}</span> : <Send size={22} />}
-        </button>
+        <div className="status-composer__send-row">
+          <button type="button" className="status-composer__audience" onClick={() => setPrivacyOpen(true)} title="Choose who can see this status">
+            <CircleDashed size={16} />
+            <span>Status ({audienceLabel})</span>
+            <ChevronRight size={15} />
+          </button>
+          <button type="button" className="fab status-composer__send" onClick={publish} disabled={busy} aria-label="Post status">
+            {busy ? <span className="fab__progress">{progress ? `${progress}%` : <Spinner size={18} className="spinner--dark" />}</span> : <Send size={22} />}
+          </button>
+        </div>
       </div>
       {privacyOpen ? (
         <Modal
-          title="Status privacy"
+          title="Choose audience"
           className="status-privacy-modal"
           onClose={() => setPrivacyOpen(false)}
           footer={<button type="button" className="btn btn--primary" onClick={() => setPrivacyOpen(false)}>Done</button>}

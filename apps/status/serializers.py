@@ -132,6 +132,9 @@ class UploadStatusSerializer(serializers.ModelSerializer):
         required=False,
         write_only=True,
     )
+    # Video status: keep only this part (seconds), cut on the server.
+    trim_start = serializers.FloatField(required=False, min_value=0, write_only=True)
+    trim_end = serializers.FloatField(required=False, min_value=0, write_only=True)
 
     class Meta:
         model = Status
@@ -143,6 +146,8 @@ class UploadStatusSerializer(serializers.ModelSerializer):
             "text_color",
             "visibility",
             "users",
+            "trim_start",
+            "trim_end",
         )
 
     def to_internal_value(self, data):
@@ -160,6 +165,7 @@ class UploadStatusSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         status_type = attrs.get("status_type")
+        trim_start, trim_end = attrs.pop("trim_start", None), attrs.pop("trim_end", None)
         content = str(attrs.get("content") or "").strip()
         media = attrs.get("media")
 
@@ -200,6 +206,10 @@ class UploadStatusSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError({
                         "media": "Upload a valid video file."
                     })
+                if trim_end is not None:
+                    from apps.chat.video_trim import trim_upload
+
+                    attrs["media"] = trim_upload(media, trim_start or 0, trim_end)
 
         visibility = attrs.get("visibility", StatusVisibility.CONTACTS)
         user_ids = list(dict.fromkeys(attrs.get("users") or []))

@@ -12,6 +12,18 @@ export function GifPanel({ onPick }) {
   const [query, setQuery] = useState("");
   const term = useDebouncedValue(query.trim(), 400);
   const [state, setState] = useState({ term: null, items: [], error: "" });
+  const [recent, setRecent] = useState([]);
+  // GIFs sent or received in your chats, like WhatsApp's "Recent".
+  useEffect(() => {
+    let cancelled = false;
+    chatApi
+      .recentGifs()
+      .then((items) => !cancelled && setRecent(items))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   useEffect(() => {
     let cancelled = false;
     chatApi
@@ -29,6 +41,17 @@ export function GifPanel({ onPick }) {
         <SearchInput value={query} onChange={setQuery} placeholder="Search GIFs via GIPHY" />
       </div>
       <div className="emoji-picker__grid gif-grid">
+        {!term && recent.length ? (
+          <>
+            <p className="gif-grid__label">Recent</p>
+            {recent.map((gif) => (
+              <button key={gif.id} type="button" className="gif-grid__item" onClick={() => onPick(gif)} title={gif.title} aria-label={gif.title || "GIF"}>
+                <video src={gif.preview} poster={gif.still || undefined} autoPlay loop muted playsInline />
+              </button>
+            ))}
+            <p className="gif-grid__label">Trending</p>
+          </>
+        ) : null}
         {loading ? (
           <div className="gif-grid__status"><Spinner /></div>
         ) : state.error ? (

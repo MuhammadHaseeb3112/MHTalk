@@ -116,3 +116,57 @@ class RecentStickersAPIView(APIView):
             if len(items) >= 40:
                 break
         return Response({"results": items})
+
+
+GIF_PREFIX = "__MHTALK_GIF__:"
+
+
+class RecentGifsAPIView(APIView):
+    """
+    GIFs sent or received in your chats (newest first), shown as "Recent"
+    on top of the GIF tab so a GIF someone sent you is one tap away.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(summary="Recent GIFs", tags=["Chat"])
+    def get(self, request):
+        import json
+
+        from .models import Message
+
+        rows = (
+            Message.objects.filter(
+                content__startswith=GIF_PREFIX,
+                is_deleted=False,
+                room__participants__user=request.user,
+            )
+            .exclude(deleted_for_users__user=request.user)
+            .order_by("-created_at")
+            .values_list("content", flat=True)[:200]
+        )
+        seen = set()
+        items = []
+        for content in rows:
+            try:
+                gif = json.loads(content[len(GIF_PREFIX):])
+            except ValueError:
+                continue
+            mp4 = gif.get("mp4") if isinstance(gif, dict) else None
+            if not mp4 or mp4 in seen or not str(mp4).startswith("https://"):
+                continue
+            seen.add(mp4)
+            items.append(
+                {
+                    "id": f"recent-{len(items)}",
+                    "mp4": mp4,
+                    "preview": mp4,
+                    "still": gif.get("still") or "",
+                    "width": gif.get("width"),
+                    "height": gif.get("height"),
+                    "title": gif.get("title") or "",
+                }
+            )
+            if len(items) >= 24:
+                break
+        return Response({"results": items})

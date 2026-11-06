@@ -4,6 +4,7 @@ import { useMediaQuery } from "../../hooks";
 import { useStore } from "../../store/store";
 import { Avatar } from "../common/ui";
 import { ChatsIcon, StatusIcon } from "../common/Icons";
+import { useAppUpdate } from "../../services/appUpdate";
 
 /**
  * Compact vertical navigation on desktop; on phones a WhatsApp-style bottom
@@ -20,6 +21,7 @@ function NavRail({ section, onChange, onOpenMedia }) {
   const unseenStatus = useStore((state) => state.statusFeed.some((group) => Number(group.unseen_count) > 0));
   const missed = useStore((state) => state.missedUnseen);
   const compact = useMediaQuery("(max-width: 900px)");
+  const update = useAppUpdate();
 
   if (compact) {
     const tabs = [
@@ -31,6 +33,8 @@ function NavRail({ section, onChange, onOpenMedia }) {
         id: "settings",
         label: "You",
         match: ["settings", "profile"],
+        dot: update.available,
+        dotLabel: "New version available",
         icon: () => <Avatar src={me?.profile?.profile_picture} name={me?.profile?.display_name} size={26} />,
       },
     ];
@@ -50,7 +54,7 @@ function NavRail({ section, onChange, onOpenMedia }) {
               <span className="tabbar__pill">
                 {tab.icon(active)}
                 {tab.badge ? <span className="tabbar__badge">{tab.badge > 99 ? "99+" : tab.badge}</span> : null}
-                {tab.dot ? <span className="tabbar__dot" aria-label="New status updates" /> : null}
+                {tab.dot ? <span className="tabbar__dot" aria-label={tab.dotLabel || "New status updates"} /> : null}
               </span>
               <span className="tabbar__label">{tab.label}</span>
             </button>
@@ -105,6 +109,7 @@ function NavRail({ section, onChange, onOpenMedia }) {
         >
           <Settings size={22} strokeWidth={1.8} />
           <span className="rail__label">Settings</span>
+          {update.available ? <span className="rail__dot" aria-label="New version available" /> : null}
         </button>
         <button
           type="button"

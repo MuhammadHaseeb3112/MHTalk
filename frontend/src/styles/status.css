@@ -447,3 +447,137 @@ button.status-composer__privacy:hover {
   background: rgba(20, 20, 20, 0.85);
   color: #fff;
 }
+
+/* WhatsApp layout: caption on its own line, then "Status (audience)" and send */
+.status-composer__bottom {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  padding: 12px 16px calc(14px + env(safe-area-inset-bottom));
+}
+.status-composer__caption {
+  flex: none;
+  border-radius: 26px;
+  padding: 0 12px 0 6px;
+}
+.status-composer__count {
+  flex: none;
+  text-align: center;
+}
+.status-composer__send-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.status-composer__audience {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: calc(100% - 80px);
+  height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 20px;
+  background: rgba(127, 127, 127, 0.22);
+  color: #fff;
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.status-composer__audience span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.status-composer--media .status-composer__audience {
+  color: var(--text);
+}
+.status-composer__send {
+  position: static;
+  flex: none;
+}
+
+/* Video trimmer (status + chat) */
+.trimmer {
+  padding: 6px 16px 0;
+}
+.trimmer__bar {
+  position: relative;
+  height: 52px;
+  border-radius: 6px;
+  overflow: visible;
+  touch-action: none;
+  user-select: none;
+}
+.trimmer__strip {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #222;
+}
+.trimmer__strip img,
+.trimmer__strip span {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  object-fit: cover;
+}
+.trimmer__shade {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+.trimmer__shade:first-of-type {
+  border-radius: 6px 0 0 6px;
+}
+.trimmer__window {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  border: 3px solid #fff;
+  border-radius: 6px;
+  pointer-events: none;
+}
+.trimmer__handle {
+  position: absolute;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  margin-top: -11px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.trimmer__handle::after {
+  content: "";
+  position: absolute;
+  inset: -14px;
+}
+.trimmer__handle--start {
+  left: -13px;
+}
+.trimmer__handle--end {
+  right: -13px;
+}
+.trimmer__info {
+  margin: 8px 0 0;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: var(--fs-sm);
+}
+.media-composer .trimmer__info {
+  color: var(--text-secondary);
+}
+.media-composer .trimmer__window {
+  border-color: var(--accent);
+}
+.media-composer .trimmer__handle {
+  background: var(--accent);
+}

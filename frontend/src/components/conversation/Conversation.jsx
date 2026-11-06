@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Copy, Download, Forward, Info, MoreVertical, Pencil, Pin, PinOff, Reply, Smile, Star, StarOff, Trash2, CheckSquare, X } from "lucide-react";
+import { Copy, Download, Forward, Heart, Info, MoreVertical, Pencil, Pin, PinOff, Reply, Smile, Star, StarOff, Trash2, CheckSquare, X } from "lucide-react";
 import { errorMessage, mediaUrl } from "../../api/client";
 import { contactsApi } from "../../api/endpoints";
 import { formatPhone, phoneDigits } from "../../utils/phone";
@@ -18,6 +18,7 @@ import CameraCapture from "../media/CameraCapture";
 import Lightbox from "../media/Lightbox";
 import MediaComposer from "../media/MediaComposer";
 import { normalizeFiles, openFilePicker, validateFiles } from "../../utils/files";
+import { rememberSticker } from "../../utils/stickers";
 import { canDeleteForEveryone, canEdit } from "../../utils/rules";
 import Composer from "./Composer";
 import ConversationHeader from "./ConversationHeader";
@@ -133,7 +134,7 @@ export default function Conversation({ roomId }) {
       const reply = replyTo;
       setComposerFiles(null);
       setReplyTo(null);
-      items.forEach((item, index) => sendFile(roomId, item.file, { caption: item.caption, viewOnce: item.viewOnce, replyTo: index === 0 ? reply : undefined }));
+      items.forEach((item, index) => sendFile(roomId, item.file, { caption: item.caption, viewOnce: item.viewOnce, trim: item.trim, replyTo: index === 0 ? reply : undefined }));
     },
     [roomId, replyTo],
   );
@@ -350,6 +351,21 @@ export default function Conversation({ roomId }) {
               link.target = "_blank";
               link.rel = "noopener";
               link.click();
+            },
+          }
+        : null,
+      message.message_type === "STICKER" && attachment
+        ? {
+            label: "Add to my stickers",
+            icon: Heart,
+            onClick: async () => {
+              try {
+                const blob = await fetch(mediaUrl(attachment.file)).then((response) => response.blob());
+                await rememberSticker(new File([blob], attachment.file_name || "sticker.webp", { type: blob.type || "image/webp" }));
+                toast("Added to your stickers");
+              } catch {
+                toast.error("Couldn't save this sticker.");
+              }
             },
           }
         : null,

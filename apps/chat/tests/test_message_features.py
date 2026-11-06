@@ -795,5 +795,17 @@ class LocationTests(TestCase):
         self.assertEqual(response.status_code, 400)
 
 
+class RecentGifTests(TestCase):
+    def test_gifs_from_chats_show_as_recent(self):
+        alice, bob = make_user("+923001110001"), make_user("+923001110002")
+        room = make_room(alice, bob)
+        gif = {"kind": "gif", "mp4": "https://media.giphy.com/a.mp4", "still": "", "title": "hi"}
+        send(client_for(bob), room, message_type="TEXT", content="__MHTALK_GIF__:" + json.dumps(gif))
+        send(client_for(bob), room, message_type="TEXT", content="__MHTALK_GIF__:" + json.dumps(gif))
+        response = client_for(alice).get("/api/chat/gifs/recent/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([item["mp4"] for item in response.data["results"]], ["https://media.giphy.com/a.mp4"])
+
+
 def tearDownModule():
     shutil.rmtree(TEST_MEDIA, ignore_errors=True)

@@ -6,6 +6,7 @@
  *   - keeps the browser's install prompt for Settings → "Install app".
  */
 import { toast } from "./toast";
+import { onApplyReload, requestOpenUpdate, setWaitingWorker } from "./appUpdate";
 
 const installListeners = new Set();
 let deferredPrompt = null;
@@ -65,15 +66,15 @@ export function getServiceWorkerRegistration() {
 }
 
 function promptUpdate(worker) {
-  toast("New version available", {
-    duration: 0,
-    action: {
-      label: "Reload",
-      onClick: () => {
-        reloading = true;
-        worker.postMessage({ type: "SKIP_WAITING" });
-      },
-    },
+  // The user decides when to update: Settings shows a green dot and the
+  // "App update" page explains what's new.
+  setWaitingWorker(worker);
+  onApplyReload(() => {
+    reloading = true;
+  });
+  toast("A new version of MHTalk is ready", {
+    duration: 8000,
+    action: { label: "What's new", onClick: requestOpenUpdate },
   });
 }
 

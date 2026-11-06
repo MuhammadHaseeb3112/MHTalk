@@ -1,0 +1,65 @@
+[
+  {
+    "version": "1.38.0",
+    "date": "2026-11-06",
+    "title": "Trim videos, GIF & sticker favourites, new status screen",
+    "items": [
+      "Cut a video before sending: drag the white handles at the start or end (chats and status).",
+      "Status videos are kept to 60 seconds, like WhatsApp.",
+      "New status screen: caption on its own line, then \"Status (audience)\" and the green send button.",
+      "Choose audience opens as a sheet: My contacts, My contacts except…, Only share with…, Everyone.",
+      "GIF tab shows \"Recent\" GIFs from your chats, including ones others sent you.",
+      "Long-press a sticker someone sent → \"Add to my stickers\" to keep it in your Sticker tab."
+    ]
+  },
+  {
+    "version": "1.37.0",
+    "date": "2026-11-06",
+    "title": "App updates in Settings",
+    "items": [
+      "Settings now shows a green dot when a new version of MHTalk is ready.",
+      "Open Settings → App update to read what's new and update when you want.",
+      "Your chats, messages and login stay the same after updating."
+    ]
+  },
+  {
+    "version": "1.36.0",
+    "date": "2026-11-06",
+    "title": "WhatsApp-style message bar",
+    "items": [
+      "Desktop: attach (📎) on the far left, then emoji, the message box, camera and the mic.",
+      "Phones: the emoji, GIF and sticker panel opens under the message box in place of the keyboard, with a ⌫ delete key.",
+      "Video previews fit the screen before sending.",
+      "Send contacts looks like WhatsApp Web, with \"You\" and \"Contacts on MHTalk\"."
+    ]
+  },
+  {
+    "version": "1.35.0",
+    "date": "2026-11-06",
+    "title": "Safer start-up",
+    "items": [
+      "If something goes wrong while opening, you see Reload / Reset app instead of a black screen.",
+      "After an update, old saved files are refreshed automatically."
+    ]
+  },
+  {
+    "version": "1.34.0",
+    "date": "2026-11-06",
+    "title": "Long messages and bigger files",
+    "items": [
+      "Very long messages show \"Read more\".",
+      "Press and hold a message: first the reactions, keep holding to select it.",
+      "Send photos, videos and documents up to 100 MB."
+    ]
+  },
+  {
+    "version": "1.33.0",
+    "date": "2026-11-06",
+    "title": "Status privacy and call info",
+    "items": [
+      "\"My contacts\" status is only shown to people you saved.",
+      "Call info lists the calls of the day you tapped.",
+      "Share a contact from Contacts or Contact info."
+    ]
+  }
+]

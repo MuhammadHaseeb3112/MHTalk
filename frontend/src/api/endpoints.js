@@ -41,6 +41,7 @@ export const contactsApi = {
 };
 
 export const chatApi = {
+  recentGifs: () => api.get("chat/gifs/recent/").then((r) => r.data.results || []),
   recentStickers: () => api.get("chat/stickers/recent/").then((r) => r.data.results || []),
   gifs: (q = "", offset = 0) => api.get("chat/gifs/", { params: { q, offset } }).then((r) => r.data),
   rooms: () => api.get("chat/rooms/", { params: { archived: "all" } }).then((r) => asList(r.data)),
@@ -88,7 +89,7 @@ export const messageApi = {
     api
       .post("chat/messages/", { room, content, reply_to, client_message_id, message_type, mentions: mentions?.length ? mentions : undefined, link_preview, status_id })
       .then((r) => r.data.data),
-  upload: ({ room, file, message_type, content, reply_to, client_message_id, view_once, mentions, status_id }, onUploadProgress) =>
+  upload: ({ room, file, message_type, content, reply_to, client_message_id, view_once, mentions, status_id, trim_start, trim_end }, onUploadProgress) =>
     api
       .post(
         "chat/messages/upload/",
@@ -102,6 +103,8 @@ export const messageApi = {
           view_once: view_once ? "true" : undefined,
           mentions: mentions?.length ? mentions.join(",") : undefined,
           status_id,
+          trim_start,
+          trim_end,
         }),
         { onUploadProgress },
       )

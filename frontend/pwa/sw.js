@@ -18,7 +18,7 @@ const CACHE_PREFIX = "mhtalk-shell-";
 const CACHE = CACHE_PREFIX + VERSION;
 const SHELL_URL = "/index.html";
 const OFFLINE_URL = "/offline.html";
-const BYPASS = /^\/(api|ws|media|admin|static)(\/|$)/;
+const BYPASS = /^\/(api|ws|media|admin|static)(\/|$)|^\/release-notes\.json$/;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

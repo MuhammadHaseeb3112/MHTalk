@@ -656,3 +656,10 @@
   color: var(--text-secondary);
   cursor: pointer;
 }
+.gif-grid__label {
+  column-span: all;
+  margin: 4px 2px 6px;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
