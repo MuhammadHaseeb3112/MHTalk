@@ -649,3 +649,56 @@
 .profile-peek__actions button:hover {
   background: var(--soft-fill-hover);
 }
+
+/* Start-up error screen (instead of a black page) */
+.app-crash {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 100dvh;
+  padding: 24px;
+  background: var(--app-bg, #161717);
+  color: var(--text, #e9edef);
+  text-align: center;
+}
+.app-crash h1 {
+  margin: 8px 0 0;
+  font-size: 1.3rem;
+  font-weight: 500;
+}
+.app-crash p {
+  max-width: 340px;
+  margin: 0;
+  color: var(--text-muted, #8696a0);
+}
+.app-crash code {
+  max-width: 340px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(127, 127, 127, 0.15);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.app-crash__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+}
+.app-crash__actions button {
+  height: 40px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent, #21c063);
+  color: #0b141a;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.app-crash__actions .is-secondary {
+  background: transparent;
+  color: var(--text, #e9edef);
+  border: 1px solid var(--hairline, #3b4a54);
+}
