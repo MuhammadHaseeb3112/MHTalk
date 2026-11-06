@@ -35,11 +35,13 @@ const GroupInfo = lazy(() => import("../info/GroupInfo"));
 const MessageInfo = lazy(() => import("../info/MessageInfo"));
 const SharedMedia = lazy(() => import("../info/SharedMedia"));
 const StarredPanel = lazy(() => import("../chat-list/StarredPanel"));
+const CallInfoPanel = lazy(() => import("../calls/CallInfoPanel"));
 
 const fallback = <div className="panel panel--loading"><Spinner /></div>;
 
 const PANELS = {
   archived: ArchivedPanel,
+  callInfo: CallInfoPanel,
   newChat: NewChatPanel,
   newContact: NewContactPanel,
   newGroup: NewGroupPanel,

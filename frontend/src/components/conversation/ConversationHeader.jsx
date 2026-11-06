@@ -30,7 +30,7 @@ import { lastSeenLabel } from "../../utils/format";
 import { contactsByUser, disappearingLabel, displayUserName } from "../../utils/messages";
 import { Avatar, IconButton, MenuButton } from "../common/ui";
 import { ringFor, useStatusGroup } from "../status/statusRing";
-import { openAvatarMenu } from "../status/profileOverlay";
+import { openUserStatus } from "../status/profileOverlay";
 import { requestJoinCall } from "../calls/groupCall";
 import { askBlock, askClearChat, askDeleteChat, askExitGroup, askMute } from "../chat-list/roomMenu";
 import { typingLabel } from "../chat-list/useChatList";
@@ -113,7 +113,7 @@ function ConversationHeader({ room, title, onOpenInfo, onSearch, onSelect, onClo
           onClick={(event) => {
             if (!ringFor(statusGroup)) return; // no status: the whole header opens contact info
             event.stopPropagation();
-            openAvatarMenu(event.currentTarget, { userId: room.otherUser?.id, title, photo, onInfo: onOpenInfo });
+            openUserStatus(room.otherUser?.id); // like the chat list: the ring opens their status
           }}
         >
           <Avatar src={photo} name={title} group={room.isGroup} size={40} ring={ringFor(statusGroup)} />

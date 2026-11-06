@@ -22,6 +22,8 @@ Configure it in ``.env`` (free options first):
 Only the Python standard library is used, so no new package is needed.
 """
 
+import base64
+import binascii
 import json
 import logging
 import urllib.error
@@ -62,6 +64,8 @@ PROVIDERS = {
     "anthropic": {"url": ANTHROPIC_URL, "model": "claude-haiku-5-5", "label": "Anthropic"},
 }
 MAX_TURNS = 30
+IMAGE_TYPES = ("image/jpeg", "image/png", "image/webp")
+MAX_IMAGE_B64 = 2_000_000  # ~1.5 MB picture; the app shrinks photos first
 MAX_CHARS = 4000
 PER_MINUTE = 20
 
@@ -104,12 +108,43 @@ def _post_json(url, body, headers, timeout):
         return json.loads(response.read().decode("utf-8"))
 
 
-def call_model(messages, config, timeout=60):
-    """Send the conversation to the configured provider and return the reply text."""
+def clean_image(raw):
+    """A photo sent with the last message: {"mime_type", "data" (base64)} or None."""
+    if not isinstance(raw, dict):
+        return None
+    mime = str(raw.get("mime_type") or "").lower()
+    data = raw.get("data")
+    if mime not in IMAGE_TYPES or not isinstance(data, str) or not data or len(data) > MAX_IMAGE_B64:
+        return None
+    try:
+        base64.b64decode(data, validate=True)
+    except (binascii.Error, ValueError):
+        return None
+    return {"mime_type": mime, "data": data}
+
+
+def call_model(messages, config, timeout=60, image=None):
+    """Send the conversation to the configured provider and return the reply text.
+
+    ``image`` (optional) is attached to the last (user) message.
+    """
+    last = len(messages) - 1
     if config["provider"] == "anthropic":
+        body = []
+        for index, item in enumerate(messages):
+            if image and index == last:
+                body.append({
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "source": {"type": "base64", "media_type": image["mime_type"], "data": image["data"]}},
+                        {"type": "text", "text": item["content"]},
+                    ],
+                })
+            else:
+                body.append(item)
         payload = _post_json(
             config["url"],
-            {"model": config["model"], "max_tokens": 1024, "system": SYSTEM_PROMPT, "messages": messages},
+            {"model": config["model"], "max_tokens": 1024, "system": SYSTEM_PROMPT, "messages": body},
             {"x-api-key": config["key"], "anthropic-version": "2023-06-01"},
             timeout,
         )
@@ -122,8 +157,13 @@ def call_model(messages, config, timeout=60):
             {
                 "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
                 "contents": [
-                    {"role": "model" if item["role"] == "assistant" else "user", "parts": [{"text": item["content"]}]}
-                    for item in messages
+                    {
+                        "role": "model" if item["role"] == "assistant" else "user",
+                        "parts": (
+                            [{"inline_data": {"mime_type": image["mime_type"], "data": image["data"]}}] if image and index == last else []
+                        ) + [{"text": item["content"]}],
+                    }
+                    for index, item in enumerate(messages)
                 ],
                 "generationConfig": {"maxOutputTokens": 1024},
             },
@@ -141,7 +181,21 @@ def call_model(messages, config, timeout=60):
         {
             "model": config["model"],
             "max_tokens": 1024,
-            "messages": [{"role": "system", "content": SYSTEM_PROMPT}, *messages],
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                *messages[:last],
+                (
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": messages[last]["content"]},
+                            {"type": "image_url", "image_url": {"url": f"data:{image['mime_type']};base64,{image['data']}"}},
+                        ],
+                    }
+                    if image
+                    else messages[last]
+                ),
+            ],
         },
         {"authorization": f"Bearer {config['key']}"},
         timeout,
@@ -216,7 +270,7 @@ class AssistantAPIView(APIView):
         cache.set(key, count + 1, 60)
 
         try:
-            reply = call_model(messages, config)
+            reply = call_model(messages, config, image=clean_image(request.data.get("image")))
         except urllib.error.HTTPError as error:
             detail = ""
             try:

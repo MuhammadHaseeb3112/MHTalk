@@ -934,3 +934,86 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
   cursor: pointer;
 }
+
+/* View contact (shared contact) */
+.view-contact__head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px 16px;
+  border-bottom: 1px solid var(--hairline);
+}
+.view-contact__head strong {
+  font-size: 1.15rem;
+  font-weight: 500;
+}
+.view-contact__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 12px 12px 8px;
+  border-bottom: 1px solid var(--hairline);
+}
+.view-contact__lead {
+  width: 44px;
+}
+.view-contact__icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+}
+.view-contact__icon:hover {
+  background: var(--soft-fill-hover);
+}
+.view-contact__number {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  padding-left: 6px;
+  font-size: 1.02rem;
+}
+.view-contact__number small {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.view-contact__actions {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 0;
+}
+.view-contact__actions button {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 22px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.view-contact__actions button:hover {
+  background: var(--soft-fill-hover);
+}
+.view-contact__actions svg {
+  color: var(--text-muted);
+}
+.view-contact-dialog .modal__body {
+  padding: 0;
+}
+@media (max-width: 600px) {
+  .modal.view-contact-dialog {
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+  }
+}

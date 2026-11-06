@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, Circle, RefreshCcw, SwitchCamera, Video, X } from "lucide-react";
+import { Camera, Circle, Image as ImageIcon, RefreshCcw, SwitchCamera, Video, X } from "lucide-react";
 import { duration as formatDuration } from "../../utils/format";
 import { IconButton, Spinner } from "../common/ui";
 
@@ -7,7 +7,7 @@ import { IconButton, Spinner } from "../common/ui";
  * Camera capture: live preview, take a photo or record a short video.
  * The captured File is handed to the media composer for preview/caption.
  */
-export default function CameraCapture({ onCapture, onClose }) {
+export default function CameraCapture({ onCapture, onClose, onGallery }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const recorderRef = useRef(null);
@@ -35,7 +35,16 @@ export default function CameraCapture({ onCapture, onClose }) {
       }
       try {
         stopStream();
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: true });
+        // Ask for exactly the front or back camera first (phones), then fall
+        // back to "whichever is closest" for laptops with one camera.
+        const size = { width: { ideal: 1280 }, height: { ideal: 720 } };
+        let stream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: facing }, ...size }, audio: true });
+        } catch (exactError) {
+          if (exactError?.name === "NotAllowedError") throw exactError;
+          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, ...size }, audio: true });
+        }
         if (cancelled) {
           stream.getTracks().forEach((track) => track.stop());
           return;
@@ -67,6 +76,10 @@ export default function CameraCapture({ onCapture, onClose }) {
     const timer = window.setInterval(() => setSeconds((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
   }, [status]);
+
+  function flip() {
+    setFacing((value) => (value === "user" ? "environment" : "user"));
+  }
 
   function takePhoto() {
     const video = videoRef.current;
@@ -117,9 +130,9 @@ export default function CameraCapture({ onCapture, onClose }) {
       <div className="camera__top">
         <IconButton icon={X} label="Close camera" onClick={() => { stopStream(); onClose(); }} />
         <span>{status === "recording" ? <><span className="recorder__dot" /> {formatDuration(seconds)}</> : "Take photo"}</span>
-        <IconButton icon={SwitchCamera} label="Switch camera" onClick={() => setFacing((value) => (value === "user" ? "environment" : "user"))} disabled={status === "recording"} />
+        <span className="camera__spacer" />
       </div>
-      <div className="camera__view">
+      <div className="camera__view" onDoubleClick={() => status !== "recording" && flip()}>
         {status === "starting" ? <Spinner size={32} /> : null}
         {status === "error" ? (
           <div className="camera__error">
@@ -141,15 +154,25 @@ export default function CameraCapture({ onCapture, onClose }) {
             <Video size={16} /> Video
           </button>
         </div>
-        <button
-          type="button"
-          className={`shutter ${mode === "video" ? "shutter--video" : ""} ${status === "recording" ? "is-recording" : ""}`}
-          onClick={mode === "photo" ? takePhoto : toggleRecording}
-          disabled={status !== "ready" && status !== "recording"}
-          aria-label={mode === "photo" ? "Take photo" : status === "recording" ? "Stop recording" : "Start recording"}
-        >
-          <Circle size={58} />
-        </button>
+        <div className="camera__row">
+          {onGallery ? (
+            <button type="button" className="camera__round" aria-label="Gallery" disabled={status === "recording"} onClick={() => { stopStream(); onGallery(); }}>
+              <ImageIcon size={24} />
+            </button>
+          ) : <span className="camera__round camera__round--blank" />}
+          <button
+            type="button"
+            className={`shutter ${mode === "video" ? "shutter--video" : ""} ${status === "recording" ? "is-recording" : ""}`}
+            onClick={mode === "photo" ? takePhoto : toggleRecording}
+            disabled={status !== "ready" && status !== "recording"}
+            aria-label={mode === "photo" ? "Take photo" : status === "recording" ? "Stop recording" : "Start recording"}
+          >
+            <Circle size={58} />
+          </button>
+          <button type="button" className="camera__round" aria-label="Switch camera (front / back)" onClick={flip} disabled={status === "recording"}>
+            <SwitchCamera size={24} />
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -15,8 +15,8 @@ import { useCalls } from "../calls/callContext";
 import Lightbox from "../media/Lightbox";
 import { InfoRow, MediaSummary } from "./shared";
 import { DisappearingDialog } from "../conversation/FeatureDialogs";
-import StatusViewer from "../status/StatusViewer";
-import { ringFor, sortedGroup, useStatusGroup } from "../status/statusRing";
+import { ringFor, useStatusGroup } from "../status/statusRing";
+import { openAvatarMenu } from "../status/profileOverlay";
 
 /** Contact info drawer (1:1 chats). */
 export default function ContactInfo({ roomId }) {
@@ -37,7 +37,6 @@ export default function ContactInfo({ roomId }) {
   const user = room?.otherUser;
   const saved = user ? contactMap.get(Number(user.id)) : null;
   const statusGroup = useStatusGroup(user?.id);
-  const [viewStatus, setViewStatus] = useState(false);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -61,7 +60,7 @@ export default function ContactInfo({ roomId }) {
             name={title}
             size={200}
             ring={ringFor(statusGroup)}
-            onClick={ringFor(statusGroup) ? () => setViewStatus(true) : photo ? () => setViewPhoto(true) : undefined}
+            onClick={ringFor(statusGroup) ? (event) => openAvatarMenu(event.currentTarget, { userId: user.id, title, photo }) : photo ? () => setViewPhoto(true) : undefined}
           />
           <h2>{title}</h2>
           <p className="info-hero__sub">{saved ? formatPhone(user.phone_number) : profileName(user) ? `~ ${profileName(user)}` : ""}</p>
@@ -142,7 +141,6 @@ export default function ContactInfo({ roomId }) {
         </Modal>
       ) : null}
       {disappearingOpen ? <DisappearingDialog room={room} onClose={() => setDisappearingOpen(false)} /> : null}
-      {viewStatus && statusGroup ? <StatusViewer groups={[sortedGroup(statusGroup)]} startGroup={0} onClose={() => setViewStatus(false)} /> : null}
       {viewPhoto ? (
         <Lightbox
           items={[{ message: { id: `photo-${user.id}`, sender: user, created_at: user.profile?.updated_at || new Date().toISOString(), content: "" }, attachment: { id: "p", file: photo, mime_type: "image/jpeg", file_name: "profile.jpg" } }]}

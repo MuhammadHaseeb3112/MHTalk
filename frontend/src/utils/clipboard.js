@@ -30,3 +30,33 @@ export async function readClipboardFiles() {
     return { files: [], text: "", error: "Allow clipboard access to paste, or copy the picture again." };
   }
 }
+
+/**
+ * Shrink a photo for MHTalk AI: a JPEG (max 1280 px) as base64 for the
+ * server, plus a small preview (data URL) to show in the chat.
+ */
+export function shrinkImage(file, max = 1280, thumbMax = 360) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const draw = (limit, quality) => {
+        const scale = Math.min(1, limit / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        return canvas.toDataURL("image/jpeg", quality);
+      };
+      const full = draw(max, 0.85);
+      const thumb = draw(thumbMax, 0.7);
+      URL.revokeObjectURL(url);
+      resolve({ mime_type: "image/jpeg", data: full.split(",")[1], thumb });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("This picture can't be opened."));
+    };
+    img.src = url;
+  });
+}

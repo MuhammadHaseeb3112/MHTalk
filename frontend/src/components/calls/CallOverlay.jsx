@@ -39,6 +39,16 @@ function MediaView({ stream, className = "", mirrored, fit = "cover" }) {
   return <video ref={ref} className={`call-video call-video--${fit} ${className} ${mirrored ? "is-mirrored" : ""}`} autoPlay playsInline muted />;
 }
 
+/** A call tile for someone whose camera is off: their picture, like WhatsApp. */
+function CameraOffTile({ name, photo }) {
+  return (
+    <div className="call-tile-off">
+      <Avatar src={photo} name={name} size={96} />
+      <span><VideoOff size={14} /> Camera off</span>
+    </div>
+  );
+}
+
 /** Small draggable preview: click to swap with the big view, drag to another corner. */
 function PictureInPicture({ corner, onCorner, onSwap, children, label, action = null }) {
   const drag = useRef(null);
@@ -398,7 +408,15 @@ export default function CallOverlay({
   // Big view: the other person when their video is on (click the small one to swap).
   let main = null;
   let pip = null;
-  if (connected && remoteTile && myTile) {
+  const faceTiles = connected && !call.group && (call.type === "video" || myTile || remoteTile);
+  if (faceTiles) {
+    // WhatsApp: in a video call both people keep a tile even with the camera
+    // off (their picture shows instead), and tapping the small one swaps.
+    const myFace = myTile || <CameraOffTile name={me?.display_name || "You"} photo={me?.profile?.profile_picture} />;
+    const remoteFace = remoteTile || <CameraOffTile name={name} photo={photo} />;
+    main = swapped ? myFace : remoteFace;
+    pip = swapped ? remoteFace : myFace;
+  } else if (connected && remoteTile && myTile) {
     main = swapped ? myTile : remoteTile;
     pip = swapped ? remoteTile : myTile;
   } else if (connected && remoteTile) {
@@ -544,7 +562,7 @@ export default function CallOverlay({
           <div className="call-screen__main">
             {main}
             <div className="call-screen__label">
-              <strong>{name}</strong>
+              <strong>{faceTiles && swapped ? "You" : name}</strong>
               <span>{call.remoteSharing ? `${status} · presenting` : status}</span>
             </div>
           </div>

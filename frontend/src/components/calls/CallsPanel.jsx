@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
+import { getCallInfo, selectCallInfo, subscribeCallInfo } from "./callInfoStore";
 import { Phone, PhoneCall, PhoneIncoming, PhoneMissed, PhoneOutgoing, Video } from "lucide-react";
 import { useStore } from "../../store/store";
 import { duration as formatDuration, listTime } from "../../utils/format";
@@ -23,6 +24,12 @@ export default function CallsPanel() {
   const [query, setQuery] = useState("");
   const [newCall, setNewCall] = useState(false);
   const contactMap = useMemo(() => contactsByUser(contacts), [contacts]);
+  const openInfo = useSyncExternalStore(subscribeCallInfo, getCallInfo);
+  function showInfo(call, room, peer) {
+    const target = { key: call.id, roomId: room?.id || null, peerId: peer?.id || null };
+    if (app.compact) app.pushPanel("callInfo", target);
+    else selectCallInfo(target);
+  }
 
   const favorites = useMemo(
     () => Object.values(rooms).filter((room) => room.isFavorite && !room.isGroup && room.otherUser).slice(0, 8),
@@ -81,7 +88,14 @@ export default function CallsPanel() {
             const label = missed ? "Missed" : outgoing ? "Outgoing" : "Incoming";
             const video = call.call_type === "VIDEO";
             return (
-              <div key={call.id} className="row call-row" role="button" tabIndex={0} onClick={() => room && app.openRoom(room.id)}>
+              <div
+                key={call.id}
+                className={`row call-row ${openInfo?.key === call.id ? "is-active" : ""}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => showInfo(call, room, peer)}
+                onKeyDown={(event) => event.key === "Enter" && showInfo(call, room, peer)}
+              >
                 <Avatar src={room?.isGroup ? room.groupPhoto : peer?.profile?.profile_picture} name={name} group={room?.isGroup} />
                 <span className="row__body">
                   <span className={`row__title ${missed ? "is-missed" : ""}`}>{name}</span>

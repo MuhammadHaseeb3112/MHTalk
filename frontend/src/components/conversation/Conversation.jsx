@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Copy, Download, Forward, Info, MessageSquare, MoreVertical, Pencil, Phone, Pin, PinOff, Reply, Smile, Star, StarOff, Trash2, CheckSquare, UserPlus, Video, X } from "lucide-react";
+import { Copy, Download, Forward, Info, MoreVertical, Pencil, Pin, PinOff, Reply, Smile, Star, StarOff, Trash2, CheckSquare, X } from "lucide-react";
 import { errorMessage, mediaUrl } from "../../api/client";
 import { contactsApi } from "../../api/endpoints";
 import { formatPhone, phoneDigits } from "../../utils/phone";
@@ -17,7 +17,7 @@ import GroupCallBanner from "../calls/GroupCallBanner";
 import CameraCapture from "../media/CameraCapture";
 import Lightbox from "../media/Lightbox";
 import MediaComposer from "../media/MediaComposer";
-import { normalizeFiles, validateFiles } from "../../utils/files";
+import { normalizeFiles, openFilePicker, validateFiles } from "../../utils/files";
 import { canDeleteForEveryone, canEdit } from "../../utils/rules";
 import Composer from "./Composer";
 import ConversationHeader from "./ConversationHeader";
@@ -26,6 +26,7 @@ import PinnedBar from "./PinnedBar";
 import ReactionPicker from "./ReactionPicker";
 import { DeleteMessagesDialog, ForwardDialog, ReactionsDialog } from "./dialogs";
 import { confirmAction } from "../common/dialogs";
+import ViewContactDialog from "./ViewContactDialog";
 import { DisappearingDialog, PollVotesDialog, ViewOnceViewer } from "./FeatureDialogs";
 import StatusViewer from "../status/StatusViewer";
 
@@ -155,7 +156,7 @@ export default function Conversation({ roomId }) {
   );
 
   // Shared contact card: Message / Voice call / Video call / Add to contacts.
-  const [contactMenu, setContactMenu] = useState(null); // { anchor, items }
+  const [viewContact, setViewContact] = useState(null);
   const handleContactCard = useCallback(
     (message, payload) => {
       const card = typeof message.content === "object" && message.content ? message.content : {};
@@ -191,19 +192,18 @@ export default function Conversation({ roomId }) {
         app.pushPanel("newContact", { initialPhone: phone, initialName: card.name });
         return;
       }
-      const saved = isMe || (getState().contacts || []).some((contact) => phoneDigits(contact.contact_user?.phone_number) === phoneDigits(phone));
-      const event = payload?.event;
-      const target = event?.currentTarget;
-      const anchor = target?.getBoundingClientRect ? target : { left: event?.clientX || 0, right: event?.clientX || 0, top: event?.clientY || 0, bottom: event?.clientY || 0 };
-      setContactMenu({
-        anchor,
-        items: [
-          isMe ? null : { label: `Message ${card.name || formatPhone(phone)}`, icon: MessageSquare, onClick: openChat },
-          isMe ? null : { label: "Voice call", icon: Phone, onClick: async () => { const user = await resolve(); if (user) callUser(user, "audio", calls.startCall); } },
-          isMe ? null : { label: "Video call", icon: Video, onClick: async () => { const user = await resolve(); if (user) callUser(user, "video", calls.startCall); } },
-          saved ? null : { label: "Add to contacts", icon: UserPlus, onClick: () => app.pushPanel("newContact", { initialPhone: phone }) },
-          { label: "Copy number", icon: Copy, onClick: () => navigator.clipboard?.writeText(formatPhone(phone)).then(() => toast("Number copied")) },
-        ].filter(Boolean),
+      const saved = isMe || (getState().contacts || []).some((contact) => phoneDigits(contact.contact_user?.phone_number).slice(-10) === phoneDigits(phone).slice(-10));
+      setViewContact({
+        card,
+        isMe,
+        saved,
+        onMessage: openChat,
+        onCall: async (type) => {
+          const user = await resolve();
+          if (user) callUser(user, type, calls.startCall);
+        },
+        onAdd: () => app.pushPanel("newContact", { initialPhone: phone, initialName: card.name }),
+        onCopy: () => navigator.clipboard?.writeText(formatPhone(phone)).then(() => toast("Number copied")),
       });
     },
     [app, calls],
@@ -437,9 +437,25 @@ export default function Conversation({ roomId }) {
         {composerFiles ? (
           <MediaComposer initialFiles={composerFiles.files} mode={composerFiles.mode} title={title} onSend={sendComposerItems} onClose={() => setComposerFiles(null)} />
         ) : null}
+        <input
+          id="conv-camera-gallery"
+          type="file"
+          accept="image/*,video/*"
+          multiple
+          hidden
+          onChange={(event) => {
+            const files = [...(event.target.files || [])];
+            event.target.value = "";
+            if (files.length) pickFiles(files.slice(0, 30), "media");
+          }}
+        />
         {camera ? (
           <CameraCapture
             onClose={() => setCamera(false)}
+            onGallery={() => {
+              setCamera(false);
+              openFilePicker("conv-camera-gallery");
+            }}
             onCapture={(file) => {
               setCamera(false);
               setComposerFiles({ files: [file], mode: "media" });
@@ -489,7 +505,7 @@ export default function Conversation({ roomId }) {
         />
       )}
 
-      {contactMenu ? <Menu anchor={contactMenu.anchor} items={contactMenu.items} onClose={() => setContactMenu(null)} align="left" /> : null}
+      {viewContact ? <ViewContactDialog {...viewContact} onClose={() => setViewContact(null)} /> : null}
       {menu ? <Menu anchor={menu.anchor} items={messageMenuItems(menu.message)} onClose={() => setMenu(null)} align={Number(menu.message.sender?.id) === Number(me.id) ? "right" : "left"} /> : null}
       {reacting ? (
         <ReactionPicker

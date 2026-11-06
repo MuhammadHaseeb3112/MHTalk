@@ -869,3 +869,137 @@
     font-size: 12px;
   }
 }
+
+/* Video call tile while that person's camera is off */
+.call-tile-off {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 50% 40%, #2a3942, #111b21);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.85rem;
+}
+.call-tile-off span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.call-pip .call-tile-off .avatar {
+  width: 48px !important;
+  height: 48px !important;
+  min-width: 48px !important;
+}
+.call-pip .call-tile-off {
+  gap: 6px;
+  font-size: 0.72rem;
+}
+
+/* Call info (WhatsApp) */
+.call-info {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--panel);
+}
+.call-info__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+.call-info__bar h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 500;
+}
+.call-info__scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 16px 24px;
+}
+.call-info__card {
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.call-info__who {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--hairline);
+}
+.call-info__who strong {
+  flex: 1;
+  min-width: 0;
+  font-size: 1.1rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.call-info__actions {
+  display: flex;
+  gap: 4px;
+}
+.call-info__actions button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+}
+.call-info__actions button:hover {
+  background: var(--soft-fill-hover);
+}
+.call-info__day {
+  padding: 12px 18px 6px;
+}
+.call-info__date {
+  margin: 0 0 8px;
+  color: var(--text-secondary);
+}
+.call-info__line {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 0;
+  color: var(--text);
+}
+.call-info__line > svg {
+  flex: none;
+  color: var(--accent);
+}
+.call-info__line.is-missed > svg {
+  color: #ef4444;
+}
+.call-info__what {
+  flex: 1;
+  min-width: 0;
+}
+.call-info__len {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  text-align: right;
+}
+@media (max-width: 600px) {
+  .call-info__line {
+    flex-wrap: wrap;
+    gap: 4px 14px;
+  }
+  .call-info__len {
+    width: 100%;
+    padding-left: 32px;
+    text-align: left;
+  }
+}

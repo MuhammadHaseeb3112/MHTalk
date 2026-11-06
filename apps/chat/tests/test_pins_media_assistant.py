@@ -145,6 +145,27 @@ class AssistantTests(TestCase):
         self.assertEqual([c["role"] for c in captured["body"]["contents"]], ["user", "model", "user"])
         self.assertIn("MHTalk AI", captured["body"]["systemInstruction"]["parts"][0]["text"])
 
+    @override_settings(MHTALK_AI_API_KEY="AQ.free-key", MHTALK_AI_PROVIDER="gemini", MHTALK_AI_MODEL="", MHTALK_AI_BASE_URL="")
+    def test_gemini_gets_the_photo_with_the_last_message(self):
+        import base64
+
+        captured, fake = self._capture({"candidates": [{"content": {"parts": [{"text": "A cat"}]}}]})
+        image = {"mime_type": "image/jpeg", "data": base64.b64encode(b"fake-jpeg").decode()}
+        with mock.patch("apps.chat.assistant.urllib.request.urlopen", fake):
+            response = self.client.post(
+                "/api/chat/ai/", {"messages": [{"role": "user", "content": "What is this?"}], "image": image}, format="json"
+            )
+        self.assertEqual(response.data["reply"], "A cat")
+        parts = captured["body"]["contents"][-1]["parts"]
+        self.assertEqual(parts[0]["inline_data"]["mime_type"], "image/jpeg")
+        self.assertEqual(parts[1]["text"], "What is this?")
+
+    def test_bad_image_is_ignored(self):
+        from apps.chat.assistant import clean_image
+
+        self.assertIsNone(clean_image({"mime_type": "image/gif", "data": "AAAA"}))
+        self.assertIsNone(clean_image({"mime_type": "image/png", "data": "not base64!!"}))
+
     @override_settings(MHTALK_AI_API_KEY="gsk_x", MHTALK_AI_PROVIDER="groq", MHTALK_AI_MODEL="")
     def test_groq_uses_the_openai_compatible_endpoint(self):
         captured, fake = self._capture({"choices": [{"message": {"content": "Hi"}}]})

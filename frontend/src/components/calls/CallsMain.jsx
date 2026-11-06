@@ -1,10 +1,14 @@
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
+import CallInfo from "./CallInfo";
+import { getCallInfo, selectCallInfo, subscribeCallInfo } from "./callInfoStore";
 import { Phone, Video } from "lucide-react";
 import NewCallDialog from "./NewCallDialog";
 
 /** Right-hand pane of the Calls section. */
 export default function CallsMain() {
   const [open, setOpen] = useState(false);
+  const info = useSyncExternalStore(subscribeCallInfo, getCallInfo);
+  if (info) return <CallInfo key={info.key} roomId={info.roomId} peerId={info.peerId} onClose={() => selectCallInfo(null)} />;
   return (
     <section className="intro intro--calls">
       <div className="intro__card">

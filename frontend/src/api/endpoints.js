@@ -158,5 +158,5 @@ export const callApi = {
 
 export const assistantApi = {
   status: () => api.get("chat/ai/").then((r) => r.data),
-  send: (messages) => api.post("chat/ai/", { messages }, { timeout: 90000 }).then((r) => r.data),
+  send: (messages, image) => api.post("chat/ai/", image ? { messages, image } : { messages }, { timeout: 90000 }).then((r) => r.data),
 };

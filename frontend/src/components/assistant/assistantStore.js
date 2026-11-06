@@ -60,17 +60,20 @@ export async function loadAssistantStatus() {
   }
 }
 
-export async function askAssistant(text) {
+export async function askAssistant(text, image = null) {
   ensureUser();
-  const content = String(text || "").trim();
-  if (!content || state.sending) return;
+  const typed = String(text || "").trim();
+  if ((!typed && !image) || state.sending) return;
+  const content = typed || "What is in this picture?";
   const now = new Date().toISOString();
-  const history = [...state.messages, { id: `u-${Date.now()}`, role: "user", content, at: now }];
+  const history = [...state.messages, { id: `u-${Date.now()}`, role: "user", content: typed, thumb: image?.thumb || "", at: now }];
   emit({ messages: history, sending: true });
   try {
-    const data = await assistantApi.send(
-      history.filter((item) => !item.error).map(({ role, content: body }) => ({ role, content: body })),
-    );
+    const sendable = history
+      .filter((item) => !item.error)
+      .map(({ role, content: body, thumb }) => ({ role, content: body || (thumb ? "[photo]" : "") }));
+    sendable[sendable.length - 1].content = content;
+    const data = await assistantApi.send(sendable, image ? { mime_type: image.mime_type, data: image.data } : null);
     emit({
       messages: [...state.messages, { id: `a-${Date.now()}`, role: "assistant", content: data.reply, at: new Date().toISOString() }],
       sending: false,

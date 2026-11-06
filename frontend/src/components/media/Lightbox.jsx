@@ -16,6 +16,9 @@ export default function Lightbox({ items, startIndex = 0, nameOf, onClose, onFor
   const videoRef = useRef(null);
   const stripRef = useRef(null);
   const current = items[index];
+  // Swipe left / right to see the next or previous photo (phones and touchpads).
+  const swipe = useRef(null);
+  const [dragX, setDragX] = useState(0);
 
   const go = useCallback((step) => setIndex((value) => Math.min(items.length - 1, Math.max(0, value + step))), [items.length]);
 
@@ -57,7 +60,37 @@ export default function Lightbox({ items, startIndex = 0, nameOf, onClose, onFor
         </div>
       </header>
 
-      <div className="lightbox__stage" onClick={(event) => event.target === event.currentTarget && onClose()}>
+      <div
+        className="lightbox__stage"
+        onClick={(event) => event.target === event.currentTarget && !swipe.current?.moved && onClose()}
+        onPointerDown={(event) => {
+          if (event.pointerType === "mouse" || event.target.closest("button, video")) return;
+          swipe.current = { x: event.clientX, y: event.clientY, moved: false };
+        }}
+        onPointerMove={(event) => {
+          const start = swipe.current;
+          if (!start) return;
+          const dx = event.clientX - start.x;
+          if (!start.moved && (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(event.clientY - start.y))) return;
+          start.moved = true;
+          const atEdge = (dx > 0 && index === 0) || (dx < 0 && index === items.length - 1);
+          setDragX(atEdge ? dx / 4 : dx);
+        }}
+        onPointerUp={(event) => {
+          const start = swipe.current;
+          swipe.current = start?.moved ? { moved: true } : null;
+          window.setTimeout(() => { swipe.current = null; }, 0);
+          if (!start?.moved) return;
+          const dx = event.clientX - start.x;
+          setDragX(0);
+          if (dx < -60) go(1);
+          else if (dx > 60) go(-1);
+        }}
+        onPointerCancel={() => {
+          swipe.current = null;
+          setDragX(0);
+        }}
+      >
         {index > 0 ? (
           <button type="button" className="lightbox__nav lightbox__nav--prev" onClick={() => go(-1)} aria-label="Previous">
             <ChevronLeft size={30} />
@@ -66,7 +99,14 @@ export default function Lightbox({ items, startIndex = 0, nameOf, onClose, onFor
         {kind === "video" ? (
           <video key={url} ref={videoRef} src={url} controls autoPlay playsInline />
         ) : (
-          <img key={url} src={url} alt={current.attachment.file_name || "Photo"} />
+          <img
+            key={url}
+            src={url}
+            alt={current.attachment.file_name || "Photo"}
+            draggable={false}
+            className={dragX ? "is-dragging" : ""}
+            style={dragX ? { transform: `translateX(${dragX}px)`, opacity: Math.max(0.4, 1 - Math.abs(dragX) / 600) } : undefined}
+          />
         )}
         {index < items.length - 1 ? (
           <button type="button" className="lightbox__nav lightbox__nav--next" onClick={() => go(1)} aria-label="Next">
@@ -75,6 +115,7 @@ export default function Lightbox({ items, startIndex = 0, nameOf, onClose, onFor
         ) : null}
       </div>
       {current.message.content ? <p className="lightbox__caption">{current.message.content}</p> : null}
+      {items.length > 1 ? <p className="lightbox__count">{index + 1} of {items.length}</p> : null}
 
       {items.length > 1 ? (
         <div className="lightbox__strip" ref={stripRef}>

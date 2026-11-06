@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ArrowLeft, ClipboardPaste, Mic, Send, Smile, Sparkles, Square } from "lucide-react";
+import { ArrowLeft, Camera, ClipboardPaste, Image as ImageIcon, Mic, Send, Smile, Sparkles, Square, X } from "lucide-react";
 import { toast } from "../../services/toast";
-import { readClipboardFiles } from "../../utils/clipboard";
+import { readClipboardFiles, shrinkImage } from "../../utils/clipboard";
+import CameraCapture from "../media/CameraCapture";
 import EmojiPicker from "../conversation/EmojiPicker";
 import { useMediaQuery } from "../../hooks";
 import { clockTime } from "../../utils/format";
@@ -40,6 +41,9 @@ export default function AssistantChat() {
   const [text, setText] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [listening, setListening] = useState(false);
+  const [photo, setPhoto] = useState(null); // { mime_type, data, thumb }
+  const [camera, setCamera] = useState(false);
+  const galleryRef = useRef(null);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
   const emojiBtnRef = useRef(null);
@@ -68,10 +72,24 @@ export default function AssistantChat() {
     });
   }
 
+  async function attachPhoto(file) {
+    if (!file?.type?.startsWith("image/")) {
+      toast("MHTalk AI can look at photos. Pick a picture.");
+      return;
+    }
+    try {
+      setPhoto(await shrinkImage(file));
+      inputRef.current?.focus();
+    } catch (error) {
+      toast.error(error.message);
+    }
+  }
+
   async function paste() {
     const result = await readClipboardFiles();
-    if (result.text) insertText(result.text);
-    else if (result.files.length) toast("MHTalk AI reads text only. Paste pictures in a chat instead.");
+    const image = result.files.find((file) => file.type.startsWith("image/"));
+    if (image) attachPhoto(image);
+    else if (result.text) insertText(result.text);
     else toast(result.error || "Clipboard is empty.");
   }
 
@@ -103,9 +121,10 @@ export default function AssistantChat() {
   function submit(event) {
     event?.preventDefault();
     const value = text.trim();
-    if (!value || sending || disabled) return;
+    if ((!value && !photo) || sending || disabled) return;
     setText("");
-    askAssistant(value);
+    setPhoto(null);
+    askAssistant(value, photo);
   }
 
   return (
@@ -137,9 +156,12 @@ export default function AssistantChat() {
               <div key={message.id} className={`msg-row ${message.role === "user" ? "msg-row--out" : "msg-row--in"}`}>
                 <div className="msg-row__inner">
                   <div className={`bubble bubble--${message.role === "user" ? "out" : "in"} ${message.error ? "bubble--ai-error" : ""}`} style={{ "--meta-w": "58px" }}>
-                    <span className="bubble__text ai-text">
-                      <Formatted text={message.content} />
-                    </span>
+                    {message.thumb ? <img className="ai-photo" src={message.thumb} alt="Photo sent to MHTalk AI" /> : null}
+                    {message.content ? (
+                      <span className="bubble__text ai-text">
+                        <Formatted text={message.content} />
+                      </span>
+                    ) : null}
                     <span className="bubble__meta"><span>{clockTime(message.at)}</span></span>
                   </div>
                 </div>
@@ -162,6 +184,13 @@ export default function AssistantChat() {
         {emojiOpen ? (
           <EmojiPicker className="emoji-picker--composer" onPick={insertText} onClose={() => setEmojiOpen(false)} ignoreRefs={[emojiBtnRef]} />
         ) : null}
+        {photo ? (
+          <div className="ai-attach">
+            <img src={photo.thumb} alt="Photo to send" />
+            <span>Photo · ask about it or just send</span>
+            <button type="button" className="icon-btn" aria-label="Remove photo" onClick={() => setPhoto(null)}><X size={18} /></button>
+          </div>
+        ) : null}
         <div className="composer__row">
           <div className="composer__pill">
             <button
@@ -180,6 +209,13 @@ export default function AssistantChat() {
               rows={1}
               value={text}
               onChange={(event) => setText(event.target.value)}
+              onPaste={(event) => {
+                const file = [...(event.clipboardData?.files || [])].find((item) => item.type.startsWith("image/"));
+                if (file) {
+                  event.preventDefault();
+                  attachPhoto(file);
+                }
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) submit(event);
               }}
@@ -188,13 +224,32 @@ export default function AssistantChat() {
               disabled={disabled}
               maxLength={4000}
             />
+            <button type="button" className="icon-btn" aria-label="Paste from clipboard" onClick={paste} disabled={disabled}>
+              <ClipboardPaste size={21} />
+            </button>
             {!text.trim() ? (
-              <button type="button" className="icon-btn" aria-label="Paste from clipboard" onClick={paste} disabled={disabled}>
-                <ClipboardPaste size={21} />
-              </button>
+              <>
+                <button type="button" className="icon-btn" aria-label="Photo from gallery" onClick={() => galleryRef.current?.click()} disabled={disabled}>
+                  <ImageIcon size={21} />
+                </button>
+                <button type="button" className="icon-btn" aria-label="Camera" onClick={() => setCamera(true)} disabled={disabled}>
+                  <Camera size={21} />
+                </button>
+              </>
             ) : null}
           </div>
-          {text.trim() ? (
+          <input
+            ref={galleryRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (file) attachPhoto(file);
+            }}
+          />
+          {text.trim() || photo ? (
             <button type="submit" className="send-btn composer__action" aria-label="Send to MHTalk AI" disabled={sending || disabled}>
               <Send size={22} />
             </button>
@@ -211,6 +266,21 @@ export default function AssistantChat() {
           )}
         </div>
       </form>
+      {camera ? (
+        <div className="camera-modal">
+          <CameraCapture
+            onClose={() => setCamera(false)}
+            onGallery={() => {
+              setCamera(false);
+              galleryRef.current?.click();
+            }}
+            onCapture={(file) => {
+              setCamera(false);
+              attachPhoto(file);
+            }}
+          />
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -568,3 +568,37 @@
 @keyframes pulse-rec {
   50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0.18); }
 }
+
+/* MHTalk AI: photo attached to the next question */
+.ai-attach {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px;
+  padding: 6px 8px;
+  border-radius: 12px;
+  background: var(--panel-raised, var(--panel));
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+}
+.ai-attach img {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+.ai-attach span {
+  flex: 1;
+}
+.ai-photo {
+  display: block;
+  max-width: min(260px, 100%);
+  max-height: 320px;
+  margin: -2px -3px 4px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+.assistant-composer .composer__input {
+  field-sizing: content;
+  max-height: 140px;
+}
