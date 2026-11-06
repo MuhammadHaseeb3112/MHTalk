@@ -641,10 +641,13 @@
   text-align: center;
   overflow: hidden;
 }
-.status-reaction__emoji {
-  font-size: 44px;
-  line-height: 52px;
-  text-align: center;
+.status-reaction__emoji,
+.bubble__text--status-emoji {
+  display: block;
+  padding: 2px 2px 0;
+  font-size: 56px;
+  line-height: 64px;
+  text-align: left;
 }
 .status-reaction__reply {
   white-space: pre-wrap;

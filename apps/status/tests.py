@@ -27,11 +27,35 @@ class StatusFeatureAPITests(TestCase):
         self.other_client = APIClient()
         self.other_client.force_authenticate(self.other)
 
+    def test_my_contacts_hides_status_from_people_the_owner_did_not_save(self):
+        from apps.chat.choices import RoomType
+        from apps.chat.models import ChatRoom, Participant
+
+        # The viewer saved the owner and they chat, but the owner never saved
+        # the viewer: "My contacts" must stay hidden (WhatsApp rule).
+        Contact.objects.create(owner=self.viewer, contact_user=self.owner)
+        room = ChatRoom.objects.create(created_by=self.viewer, room_type=RoomType.PRIVATE)
+        Participant.objects.create(room=room, user=self.owner)
+        Participant.objects.create(room=room, user=self.viewer)
+        Status.objects.create(user=self.owner, status_type=StatusType.TEXT, content="contacts only", visibility=StatusVisibility.CONTACTS)
+        Status.objects.create(user=self.other, status_type=StatusType.TEXT, content="everyone", visibility=StatusVisibility.EVERYONE)
+        feed = self.viewer_client.get("/api/status/")
+        owners = {int(group["user"]["id"]) for group in feed.data}
+        self.assertNotIn(self.owner.id, owners)
+        # A stranger's "Everyone" status is not shown either.
+        self.assertNotIn(self.other.id, owners)
+        # Once the owner saves the viewer, it shows.
+        Contact.objects.create(owner=self.owner, contact_user=self.viewer)
+        feed = self.viewer_client.get("/api/status/")
+        self.assertIn(self.owner.id, {int(group["user"]["id"]) for group in feed.data})
+
     def add_mutual_contact(self, first, second):
         Contact.objects.get_or_create(owner=first, contact_user=second)
         Contact.objects.get_or_create(owner=second, contact_user=first)
 
     def test_everyone_status_can_be_viewed_and_count_comes_from_view_records(self):
+        # "Everyone" = anyone connected to the owner (here: the viewer saved them).
+        Contact.objects.create(owner=self.viewer, contact_user=self.owner)
         upload = self.owner_client.post(
             "/api/status/upload/",
             {"status_type": "TEXT", "content": "Hello MHTalk", "visibility": "EVERYONE"},

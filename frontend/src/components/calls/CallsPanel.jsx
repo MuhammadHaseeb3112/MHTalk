@@ -2,7 +2,7 @@ import { useMemo, useState, useSyncExternalStore } from "react";
 import { getCallInfo, selectCallInfo, subscribeCallInfo } from "./callInfoStore";
 import { Phone, PhoneCall, PhoneIncoming, PhoneMissed, PhoneOutgoing, Video } from "lucide-react";
 import { useStore } from "../../store/store";
-import { duration as formatDuration, listTime } from "../../utils/format";
+import { dayLabel, duration as formatDuration, listTime } from "../../utils/format";
 import { contactsByUser, displayUserName, roomTitle } from "../../utils/messages";
 import { Avatar, EmptyState, IconButton, PanelHeader, SearchInput } from "../common/ui";
 import { useApp } from "../layout/AppContext";
@@ -26,7 +26,8 @@ export default function CallsPanel() {
   const contactMap = useMemo(() => contactsByUser(contacts), [contacts]);
   const openInfo = useSyncExternalStore(subscribeCallInfo, getCallInfo);
   function showInfo(call, room, peer) {
-    const target = { key: call.id, roomId: room?.id || null, peerId: peer?.id || null };
+    // Like WhatsApp: Call info lists only that day's calls with this person.
+    const target = { key: call.id, roomId: room?.id || null, peerId: peer?.id || null, day: dayLabel(call.started_at) };
     if (app.compact) app.pushPanel("callInfo", target);
     else selectCallInfo(target);
   }
@@ -45,7 +46,18 @@ export default function CallsPanel() {
         const name = room ? roomTitle(room, contactMap, me) : peer ? displayUserName(peer, contactMap) : "Unknown";
         return { call, room, peer, name };
       })
-      .filter(({ name }) => !term || name.toLowerCase().includes(term));
+      .filter(({ name }) => !term || name.toLowerCase().includes(term))
+      .reduce((groups, row) => {
+        // Back-to-back calls with the same person, same day and same kind
+        // collapse into one row: "Outgoing (2)".
+        const kind = row.call.is_missed ? "missed" : Number(row.call.caller?.id) === Number(me.id) ? "out" : "in";
+        const who = row.room?.id || row.peer?.id;
+        const day = dayLabel(row.call.started_at);
+        const last = groups[groups.length - 1];
+        if (last && last.who === who && last.day === day && last.kind === kind) last.count += 1;
+        else groups.push({ ...row, who, day, kind, count: 1 });
+        return groups;
+      }, []);
   }, [calls, rooms, contactMap, me, query]);
 
   return (
@@ -80,7 +92,7 @@ export default function CallsPanel() {
         <div className="section-label section-label--plain">Recent</div>
         {!rows.length ? <EmptyState icon={Phone} title="No calls yet" text="Voice and video calls you make or receive appear here." /> : null}
         <div className="list-pad">
-          {rows.map(({ call, room, peer, name }) => {
+          {rows.map(({ call, room, peer, name, count }) => {
             const outgoing = Number(call.caller?.id) === Number(me.id);
             const missed = call.is_missed;
             const joinedCount = call.is_group ? (call.participants || []).filter((p) => p.answered_at).length : 0;
@@ -100,9 +112,9 @@ export default function CallsPanel() {
                 <span className="row__body">
                   <span className={`row__title ${missed ? "is-missed" : ""}`}>{name}</span>
                   <span className={`row__subtitle call-row__sub ${missed ? "is-missed" : ""}`}>
-                    <Icon size={15} /> {label}
+                    <Icon size={15} /> {label}{count > 1 ? ` (${count})` : ""}
                     {call.is_group && joinedCount > 1 ? ` · ${joinedCount} joined` : ""}
-                    {call.answered_at && call.duration && !missed ? ` · ${formatDuration(call.duration)}` : ""}
+                    {count === 1 && call.answered_at && call.duration && !missed ? ` · ${formatDuration(call.duration)}` : ""}
                   </span>
                 </span>
                 <span className="call-row__time">{listTime(call.started_at)}</span>

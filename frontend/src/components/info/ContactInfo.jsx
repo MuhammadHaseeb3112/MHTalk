@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useStarredCount } from "../../hooks";
-import { Ban, Bell, BellOff, Eraser, Heart, HeartOff, Pencil, Phone, Star, Timer, Trash2, UserPlus, Video } from "lucide-react";
+import { Ban, Bell, BellOff, Eraser, Heart, HeartOff, Pencil, Phone, Share2, Star, Timer, Trash2, UserPlus, Video } from "lucide-react";
+import { ForwardDialog } from "../conversation/dialogs";
+import { sendContactCard } from "../conversation/shareContact";
 import { contactsApi } from "../../api/endpoints";
 import { favoriteRoom, muteRoom } from "../../store/actions";
 import { useStore } from "../../store/store";
@@ -31,6 +33,7 @@ export default function ContactInfo({ roomId }) {
   const contactMap = useMemo(() => contactsByUser(contacts), [contacts]);
   const [groups, setGroups] = useState([]);
   const [editing, setEditing] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [viewPhoto, setViewPhoto] = useState(false);
   const [disappearingOpen, setDisappearingOpen] = useState(false);
 
@@ -129,6 +132,7 @@ export default function ContactInfo({ roomId }) {
             title={room.isFavorite ? "Remove from favorites" : "Add to favorites"}
             onClick={() => favoriteRoom(room.id, !room.isFavorite)}
           />
+          {user?.phone_number ? <InfoRow icon={Share2} title="Share contact" onClick={() => setShareOpen(true)} /> : null}
           <InfoRow icon={Ban} title={blocked ? `Unblock ${title}` : `Block ${title}`} danger onClick={() => askBlock(room, title, blocked)} />
           <InfoRow icon={Eraser} title="Clear chat" danger onClick={() => askClearChat(room)} />
           <InfoRow icon={Trash2} title="Delete chat" danger onClick={() => askDeleteChat(room, title)} />
@@ -141,6 +145,13 @@ export default function ContactInfo({ roomId }) {
         </Modal>
       ) : null}
       {disappearingOpen ? <DisappearingDialog room={room} onClose={() => setDisappearingOpen(false)} /> : null}
+      {shareOpen ? (
+        <ForwardDialog
+          title={`Share ${title} to`}
+          onClose={() => setShareOpen(false)}
+          onSend={(roomIds) => sendContactCard({ name: title, phone: user.phone_number }, roomIds)}
+        />
+      ) : null}
       {viewPhoto ? (
         <Lightbox
           items={[{ message: { id: `photo-${user.id}`, sender: user, created_at: user.profile?.updated_at || new Date().toISOString(), content: "" }, attachment: { id: "p", file: photo, mime_type: "image/jpeg", file_name: "profile.jpg" } }]}

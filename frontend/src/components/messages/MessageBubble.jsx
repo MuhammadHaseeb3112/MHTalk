@@ -419,6 +419,8 @@ function MessageBubble({
   const special = kind === "call" || kind === "status_reaction" || kind === "gif" ? parseSpecial(message.content) : null;
   const caption = kind === "image" || kind === "video" ? message.content : "";
   const statusRef = message.status_ref && kind !== "status_reaction" ? message.status_ref : null;
+  // A reply to a status that is only emoji shows them big, like WhatsApp.
+  const statusEmoji = Boolean(statusRef) && kind === "text" && message.content && message.content.length <= 24 && EMOJI_ONLY.test(message.content);
   const emojiOnly = !statusRef && ((kind === "text" && message.content && message.content.length <= 24 && EMOJI_ONLY.test(message.content)) || kind === "sticker");
   const isMedia = !statusRef && (((kind === "image" || kind === "video") && !caption) || kind === "gif");
   const pending = Boolean(message._pending);
@@ -497,7 +499,7 @@ function MessageBubble({
       body = (
         <>
           {message.link_preview ? <LinkPreviewCard preview={message.link_preview} /> : null}
-          <span className={`bubble__text ${emojiOnly ? "bubble__text--emoji" : ""}`}>
+          <span className={`bubble__text ${emojiOnly ? "bubble__text--emoji" : ""} ${statusEmoji ? "bubble__text--status-emoji" : ""}`}>
             <RichText text={message.content} query={searchQuery} mentions={mentions} onMention={onMention} />
           </span>
         </>

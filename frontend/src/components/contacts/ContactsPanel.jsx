@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
-import { MessageSquare, Pencil, UserPlus, Users } from "lucide-react";
+import { MessageSquare, Pencil, Share2, UserPlus, Users } from "lucide-react";
+import { ForwardDialog } from "../conversation/dialogs";
+import { sendContactCard } from "../conversation/shareContact";
 import { errorMessage } from "../../api/client";
 import { openChatWith } from "../../store/actions";
 import { useStore } from "../../store/store";
@@ -17,6 +19,7 @@ export default function ContactsPanel() {
   const contacts = useStore((state) => state.contacts);
   const [query, setQuery] = useState("");
   const [editor, setEditor] = useState(null); // null | { contact? }
+  const [sharing, setSharing] = useState(null); // contact being shared
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -88,6 +91,7 @@ export default function ContactsPanel() {
                   </span>
                   <span className="contact-row__actions">
                     <IconButton icon={MessageSquare} label={`Message ${contact.name}`} onClick={(event) => { event.stopPropagation(); open(contact); }} />
+                    <IconButton icon={Share2} label={`Share ${contact.name}`} onClick={(event) => { event.stopPropagation(); setSharing(contact); }} />
                     <IconButton icon={Pencil} label={`Edit ${contact.name}`} onClick={(event) => { event.stopPropagation(); setEditor({ contact }); }} />
                   </span>
                 </div>
@@ -105,6 +109,13 @@ export default function ContactsPanel() {
           )
         ) : null}
       </div>
+      {sharing ? (
+        <ForwardDialog
+          title={`Share ${sharing.name} to`}
+          onClose={() => setSharing(null)}
+          onSend={(roomIds) => sendContactCard({ name: sharing.name, phone: sharing.contact_user?.phone_number }, roomIds)}
+        />
+      ) : null}
     </section>
   );
 }

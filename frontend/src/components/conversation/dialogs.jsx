@@ -39,7 +39,7 @@ export function DeleteMessagesDialog({ roomId, messages, myId, onClose, onDone }
 }
 
 /** Pick up to 5 chats and forward the selected messages. */
-export function ForwardDialog({ messages, onClose, onDone }) {
+export function ForwardDialog({ messages, onClose, onDone, title = "Forward message to", onSend }) {
   const rooms = useStore((state) => state.rooms);
   const contacts = useStore((state) => state.contacts);
   const me = useStore((state) => state.me);
@@ -59,14 +59,15 @@ export function ForwardDialog({ messages, onClose, onDone }) {
 
   async function send() {
     setBusy(true);
-    await forwardMessages(messages, selected);
+    if (onSend) await onSend(selected);
+    else await forwardMessages(messages, selected);
     setBusy(false);
     onDone?.();
     onClose();
   }
 
   return (
-    <Modal title="Forward message to" onClose={busy ? undefined : onClose} width={460} className="forward-dialog">
+    <Modal title={title} onClose={busy ? undefined : onClose} width={460} className="forward-dialog">
       <SearchInput value={query} onChange={setQuery} placeholder="Search" autoFocus />
       <div className="forward-dialog__list">
         {list.map(({ room, title }) => (

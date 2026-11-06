@@ -8,7 +8,7 @@ import NewCallDialog from "./NewCallDialog";
 export default function CallsMain() {
   const [open, setOpen] = useState(false);
   const info = useSyncExternalStore(subscribeCallInfo, getCallInfo);
-  if (info) return <CallInfo key={info.key} roomId={info.roomId} peerId={info.peerId} onClose={() => selectCallInfo(null)} />;
+  if (info) return <CallInfo key={info.key} roomId={info.roomId} peerId={info.peerId} day={info.day} onClose={() => selectCallInfo(null)} />;
   return (
     <section className="intro intro--calls">
       <div className="intro__card">

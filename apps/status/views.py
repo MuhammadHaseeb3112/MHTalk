@@ -189,45 +189,35 @@ class ContactsStatusAPIView(APIView):
 
         visibility = status_obj.visibility
 
-        # EVERYONE does not require mutual contacts.
-        if visibility == StatusVisibility.EVERYONE:
-            return True
+        if saved_me_ids is not None:
+            owner_has_saved_viewer = status_obj.user_id in saved_me_ids
+        else:
+            owner_has_saved_viewer = Contact.objects.filter(
+                owner_id=status_obj.user_id,
+                contact_user_id=user.id,
+            ).exists()
 
-        # For all other privacy modes, the viewer must have
-        # saved the status owner.
+        # "Everyone": anyone who has a chat with the owner or has them saved
+        # (or whom the owner saved) — never strangers.
+        if visibility == StatusVisibility.EVERYONE:
+            return status_obj.user_id in contact_ids or owner_has_saved_viewer
+
+        # For all other privacy modes, the viewer must know the owner
+        # (saved them or chats with them).
         if status_obj.user_id not in contact_ids:
             return False
 
-        # Default Contacts visibility follows the mutual-contact rule.
-        # Custom audiences are explicitly chosen by the publisher from their
-        # saved contacts, so do not silently discard a selected contact merely
-        # because the other person has not saved the publisher in return.
+        # "My contacts" (WhatsApp): only people the OWNER has saved. Just
+        # having a chat with the owner is not enough — a new person who
+        # messages you must not see your status.
         if visibility == StatusVisibility.CONTACTS:
-            # The feed passes both sets precomputed (one query each) so the
-            # check costs no query per status.
-            if saved_me_ids is not None:
-                owner_has_saved_viewer = status_obj.user_id in saved_me_ids
-            else:
-                owner_has_saved_viewer = Contact.objects.filter(
-                    owner_id=status_obj.user_id,
-                    contact_user_id=user.id,
-                ).exists()
-            if chat_partner_ids is not None:
-                shared_private_chat = status_obj.user_id in chat_partner_ids
-            else:
-                shared_private_chat = Participant.objects.filter(
-                    room__room_type=RoomType.PRIVATE,
-                    room__is_active=True,
-                    room__participants__user_id=status_obj.user_id,
-                    user_id=user.id,
-                ).exists()
-            return owner_has_saved_viewer or shared_private_chat
+            return owner_has_saved_viewer
 
         # privacy_rules is prefetched by the feed query.
         listed = any(rule.user_id == user.id for rule in status_obj.privacy_rules.all())
 
         if visibility == StatusVisibility.CONTACTS_EXCEPT:
-            return not listed
+            return owner_has_saved_viewer and not listed
 
         # Only selected contacts.
         if visibility == StatusVisibility.ONLY_SHARE_WITH:
@@ -252,19 +242,9 @@ class ContactsStatusAPIView(APIView):
             Contact.objects.filter(contact_user=request.user).values_list("owner_id", flat=True)
         )
 
-        # Include contacts and all potential EVERYONE status owners.
-        candidate_ids = contact_ids | set(
-            Status.objects.filter(
-                visibility=StatusVisibility.EVERYONE,
-                is_deleted=False,
-                user__is_active=True,
-                user__is_deleted=False,
-                expires_at__gt=timezone.now(),
-            )
-            .exclude(user=request.user)
-            .values_list("user_id", flat=True)
-            .distinct()
-        )
+        # Only people connected to me (saved either way or chatting) can
+        # ever show up; each status is then checked against its audience.
+        candidate_ids = contact_ids | saved_me_ids
         # Blocked either way: neither side sees the other's status.
         from apps.chat.utils import blocked_user_ids
 

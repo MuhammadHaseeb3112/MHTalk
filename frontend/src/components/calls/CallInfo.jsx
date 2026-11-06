@@ -30,7 +30,7 @@ function outcome(call, outgoing) {
  * WhatsApp "Call info": the person with Message / Video / Voice buttons and
  * every call with them, grouped by day, with time and how long it lasted.
  */
-export default function CallInfo({ roomId, peerId, onClose }) {
+export default function CallInfo({ roomId, peerId, day, onClose }) {
   const app = useApp();
   const { startCall } = useCalls();
   const calls = useStore((state) => state.calls);
@@ -43,8 +43,9 @@ export default function CallInfo({ roomId, peerId, onClose }) {
     () =>
       calls
         .filter((call) => (roomId ? Number(call.room) === Number(roomId) : [call.caller, ...(call.participants || []).map((p) => p.user)].some((user) => Number(user?.id) === Number(peerId))))
+        .filter((call) => !day || dayLabel(call.started_at) === day)
         .sort((a, b) => new Date(b.started_at) - new Date(a.started_at)),
-    [calls, roomId, peerId],
+    [calls, roomId, peerId, day],
   );
   const first = history[0];
   const peer = room?.otherUser || (first && (Number(first.caller?.id) !== Number(me.id) ? first.caller : first.participants?.map((p) => p.user).find((u) => Number(u?.id) !== Number(me.id))));
