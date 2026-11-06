@@ -30,6 +30,7 @@ import { lastSeenLabel } from "../../utils/format";
 import { contactsByUser, disappearingLabel, displayUserName } from "../../utils/messages";
 import { Avatar, IconButton, MenuButton } from "../common/ui";
 import { ringFor, useStatusGroup } from "../status/statusRing";
+import { openAvatarMenu } from "../status/profileOverlay";
 import { requestJoinCall } from "../calls/groupCall";
 import { askBlock, askClearChat, askDeleteChat, askExitGroup, askMute } from "../chat-list/roomMenu";
 import { typingLabel } from "../chat-list/useChatList";
@@ -107,7 +108,14 @@ function ConversationHeader({ room, title, onOpenInfo, onSearch, onSelect, onClo
     <header className="conv-header">
       {compact ? <IconButton icon={ArrowLeft} label="Back to chats" onClick={onClose} /> : null}
       <button type="button" className="conv-header__who" onClick={onOpenInfo} aria-label={`${title} info`}>
-        <span className="avatar-wrap">
+        <span
+          className="avatar-wrap"
+          onClick={(event) => {
+            if (!ringFor(statusGroup)) return; // no status: the whole header opens contact info
+            event.stopPropagation();
+            openAvatarMenu(event.currentTarget, { userId: room.otherUser?.id, title, photo, onInfo: onOpenInfo });
+          }}
+        >
           <Avatar src={photo} name={title} group={room.isGroup} size={40} ring={ringFor(statusGroup)} />
           {room.disappearingSeconds ? (
             <span className="avatar-timer avatar-timer--sm" title={`Disappearing messages: ${disappearingLabel(room.disappearingSeconds)}`}>

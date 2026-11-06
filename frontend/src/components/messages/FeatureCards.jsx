@@ -4,6 +4,8 @@ import { isSharingLive, stopLiveLocation, subscribeLiveLocation } from "../../se
 import { clockTime } from "../../utils/format";
 import { googleMapsUrl, myPollVotes, osmTilePoint, viewOnceState } from "../../utils/messages";
 import { Avatar } from "../common/ui";
+import { useStore } from "../../store/store";
+import { formatPhone, phoneDigits } from "../../utils/phone";
 
 /**
  * Bubble bodies for polls, view once media, shared locations and link
@@ -176,11 +178,13 @@ function LiveLocationFooter({ card, messageId, mine }) {
   const sharingHere = useSyncExternalStore(subscribeLiveLocation, () => isSharingLive(messageId));
   const active = !card.stopped && Number.isFinite(until) && until > now;
   return (
-    <span className="location-card__live">
-      <span className={`location-card__live-icon ${active ? "is-active" : ""}`}><Radio size={16} /></span>
-      <span className="location-card__live-text">
-        <strong>{active ? "Live location" : "Live location ended"}</strong>
-        <small>{active ? `Live until ${clockTime(card.live_until)}` : card.updated_at ? `Last updated ${clockTime(card.updated_at)}` : ""}</small>
+    <>
+      <span className="location-card__live">
+        <span className={`location-card__live-icon ${active ? "is-active" : ""}`}><Radio size={16} /></span>
+        <span className="location-card__live-text">
+          <strong>{active ? "Live location" : "Live location ended"}</strong>
+          <small>{active ? `Live until ${clockTime(card.live_until)}` : card.updated_at ? `Last updated ${clockTime(card.updated_at)}` : ""}</small>
+        </span>
       </span>
       {mine && active ? (
         <button
@@ -192,10 +196,10 @@ function LiveLocationFooter({ card, messageId, mine }) {
             stopLiveLocation(messageId);
           }}
         >
-          {sharingHere ? "Stop sharing" : "Stop"}
+          {sharingHere ? "Stop sharing" : "Stop sharing live location"}
         </button>
       ) : null}
-    </span>
+    </>
   );
 }
 
@@ -268,5 +272,57 @@ export function LinkPreviewCard({ preview, compact = false, onRemove }) {
     <a className="link-card" href={preview.url} target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()}>
       {body}
     </a>
+  );
+}
+
+const lastTen = (value) => phoneDigits(value).slice(-10);
+
+/**
+ * Shared contact bubble, WhatsApp style: picture + name, then
+ * "Message" and "Add contact" (only when the number isn't saved yet).
+ */
+export function ContactCard({ content, onAction }) {
+  const card = content && typeof content === "object" ? content : {};
+  const key = lastTen(card.phone);
+  const known = useStore((state) => {
+    if (!key) return null;
+    if (lastTen(state.me?.phone_number) === key) return { self: true, user: state.me };
+    const saved = state.contacts.find((contact) => lastTen(contact.contact_user?.phone_number) === key);
+    if (saved) return { saved: true, user: saved.contact_user };
+    const room = Object.values(state.rooms).find((item) => !item.isGroup && lastTen(item.otherUser?.phone_number) === key);
+    return room ? { user: room.otherUser } : null;
+  });
+  const name = card.name || formatPhone(card.phone);
+  const photo = known?.user?.profile?.profile_picture;
+  return (
+    <div className="contact-card">
+      <button
+        type="button"
+        className="contact-card__main"
+        onClick={(event) => {
+          event.stopPropagation();
+          onAction("menu", event);
+        }}
+        aria-label={`Contact ${name} options`}
+      >
+        <Avatar src={photo} name={name} size={46} />
+        <span className="contact-card__text">
+          <span className="contact-card__name">{name}{known?.self ? " (You)" : ""}</span>
+          {card.name && card.phone ? <span className="contact-card__phone">{formatPhone(card.phone)}</span> : null}
+        </span>
+      </button>
+      {known?.self ? null : (
+        <div className="contact-card__actions">
+          <button type="button" onClick={(event) => { event.stopPropagation(); onAction("message", event); }}>
+            Message
+          </button>
+          {known?.saved ? null : (
+            <button type="button" onClick={(event) => { event.stopPropagation(); onAction("add", event); }}>
+              Add contact
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

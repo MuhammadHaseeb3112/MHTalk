@@ -181,11 +181,16 @@ export default function Conversation({ roomId }) {
           toast.error(errorMessage(error));
         }
       };
+      const isMe = phoneDigits(getState().me?.phone_number).slice(-10) === phoneDigits(phone).slice(-10);
       if (payload?.action === "message") {
-        openChat();
+        if (isMe) toast("This is your own number.");
+        else openChat();
         return;
       }
-      const isMe = phoneDigits(getState().me?.phone_number) === phoneDigits(phone);
+      if (payload?.action === "add") {
+        app.pushPanel("newContact", { initialPhone: phone, initialName: card.name });
+        return;
+      }
       const saved = isMe || (getState().contacts || []).some((contact) => phoneDigits(contact.contact_user?.phone_number) === phoneDigits(phone));
       const event = payload?.event;
       const target = event?.currentTarget;
@@ -193,7 +198,7 @@ export default function Conversation({ roomId }) {
       setContactMenu({
         anchor,
         items: [
-          { label: `Message ${card.name || formatPhone(phone)}`, icon: MessageSquare, onClick: openChat },
+          isMe ? null : { label: `Message ${card.name || formatPhone(phone)}`, icon: MessageSquare, onClick: openChat },
           isMe ? null : { label: "Voice call", icon: Phone, onClick: async () => { const user = await resolve(); if (user) callUser(user, "audio", calls.startCall); } },
           isMe ? null : { label: "Video call", icon: Video, onClick: async () => { const user = await resolve(); if (user) callUser(user, "video", calls.startCall); } },
           saved ? null : { label: "Add to contacts", icon: UserPlus, onClick: () => app.pushPanel("newContact", { initialPhone: phone }) },

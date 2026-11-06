@@ -16,6 +16,7 @@ import SearchMessages from "../info/SearchMessages";
 import { CallProvider } from "../calls/CallManager";
 import { AppContext } from "./AppContext";
 import IntroPane from "./IntroPane";
+import ProfileOverlays from "../status/ProfileOverlays";
 import { Spinner } from "../common/ui";
 
 // Less-used screens load on demand to keep the first download small.
@@ -226,6 +227,7 @@ export default function MainLayout({ onLogout }) {
             <AllMediaDialog onClose={() => setMediaOpen(false)} onOpenRoom={openRoom} />
           </Suspense>
         ) : null}
+        <ProfileOverlays />
       </CallProvider>
     </AppContext.Provider>
   );

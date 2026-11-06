@@ -15,20 +15,19 @@ import {
   RotateCw,
   Smile,
   Star,
-  UserRound,
   Video,
   Video as VideoIcon,
 } from "lucide-react";
 import { mediaUrl } from "../../api/client";
 import { emojiOnly } from "../../utils/emoji";
-import { formatPhone } from "../../utils/phone";
 import { clockTime, duration as formatDuration, fileSize } from "../../utils/format";
 import { attachmentKind, callSummary, messageKind, parseSpecial, previewText, URL_PATTERN } from "../../utils/messages";
 import { BubbleTail } from "../common/Icons";
 import { Checkbox } from "../common/ui";
 import { Ticks } from "../chat-list/ChatListItem";
 import AudioPlayer from "./AudioPlayer";
-import { LinkPreviewCard, LocationCard, PollCard, ViewOnceContent } from "./FeatureCards";
+import { LinkPreviewCard,
+  ContactCard, LocationCard, PollCard, ViewOnceContent } from "./FeatureCards";
 
 const EMOJI_ONLY = /^(?:\p{Extended_Pictographic}|\p{Emoji_Component}|‍|️|\s)+$/u;
 
@@ -491,37 +490,9 @@ function MessageBubble({
     case "location":
       body = <LocationCard content={message.content} messageId={message.id} mine={isOwn} />;
       break;
-    case "contact": {
-      const card = typeof message.content === "object" && message.content ? message.content : {};
-      body = (
-        <div className="contact-card">
-          <button
-            type="button"
-            className="contact-card__main"
-            onClick={(event) => {
-              event.stopPropagation();
-              onAction("contact", message, { event, action: "menu" });
-            }}
-            aria-label={`Contact ${card.name || card.phone || ""} options`}
-          >
-            <span className="contact-card__avatar"><UserRound size={22} /></span>
-            <span className="contact-card__text">
-              <span className="contact-card__name">{card.name || formatPhone(card.phone)}</span>
-              {card.name && card.phone ? <span className="contact-card__phone">{formatPhone(card.phone)}</span> : null}
-            </span>
-          </button>
-          <div className="contact-card__actions">
-            <button type="button" onClick={(event) => { event.stopPropagation(); onAction("contact", message, { event, action: "message" }); }}>
-              Message
-            </button>
-            <button type="button" onClick={(event) => { event.stopPropagation(); onAction("contact", message, { event, action: "menu" }); }}>
-              More
-            </button>
-          </div>
-        </div>
-      );
+    case "contact":
+      body = <ContactCard content={message.content} onAction={(action, event) => onAction("contact", message, { event, action })} />;
       break;
-    }
     default:
       body = (
         <>

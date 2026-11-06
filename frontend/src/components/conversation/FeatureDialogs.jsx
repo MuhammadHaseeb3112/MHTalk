@@ -191,6 +191,8 @@ export function LocationDialog({ onClose, onSend, allowLive = true }) {
   }, [attempt]);
 
   const coords = state.position;
+  const phone = window.innerWidth <= 600;
+  const mapSize = phone ? { width: window.innerWidth, height: Math.round(window.innerHeight * 0.4) } : { width: 392, height: 200 };
   const base = coords
     ? { latitude: coords.latitude, longitude: coords.longitude, accuracy: Number.isFinite(coords.accuracy) ? Math.round(coords.accuracy) : undefined }
     : null;
@@ -198,7 +200,7 @@ export function LocationDialog({ onClose, onSend, allowLive = true }) {
     return (
       <Modal title="Share live location" onClose={onClose} width={440} className="location-dialog">
         <div className="location-dialog__map">
-          <MapPreview latitude={base.latitude} longitude={base.longitude} width={Math.min(392, window.innerWidth - 48)} height={160} />
+          <MapPreview latitude={base.latitude} longitude={base.longitude} width={mapSize.width} height={phone ? Math.round(mapSize.height * 0.8) : 160} />
         </div>
         <p className="location-dialog__note">Participants in this chat will see your location in real time while this chat is open on your phone.</p>
         <div className="location-dialog__durations" role="radiogroup" aria-label="Share for">
@@ -238,16 +240,26 @@ export function LocationDialog({ onClose, onSend, allowLive = true }) {
       {coords ? (
         <>
           <div className="location-dialog__map">
-            <MapPreview latitude={coords.latitude} longitude={coords.longitude} width={Math.min(392, window.innerWidth - 48)} height={200} />
+            <MapPreview latitude={coords.latitude} longitude={coords.longitude} width={mapSize.width} height={mapSize.height} />
+            <button
+              type="button"
+              className="location-dialog__recenter"
+              aria-label="Refresh my location"
+              onClick={() => { setState({ status: "locating", position: null, error: "" }); setAttempt((value) => value + 1); }}
+            >
+              <LocateFixed size={20} />
+            </button>
           </div>
-          <input
-            className="line-input"
-            value={name}
-            maxLength={120}
-            placeholder="Place name (optional)"
-            aria-label="Place name"
-            onChange={(event) => setName(event.target.value)}
-          />
+          {allowLive ? (
+            <button type="button" className="location-dialog__send" onClick={() => setLiveOpen(true)}>
+              <span className="location-dialog__icon location-dialog__icon--live"><Radio size={22} /></span>
+              <span>
+                <strong>Share live location</strong>
+                <small>15 minutes, 1 hour or 8 hours</small>
+              </span>
+            </button>
+          ) : null}
+          <p className="location-dialog__section">Your location</p>
           <button
             type="button"
             className="location-dialog__send"
@@ -260,19 +272,20 @@ export function LocationDialog({ onClose, onSend, allowLive = true }) {
               })
             }
           >
-            <span className="location-dialog__icon"><LocateFixed size={22} /></span>
+            <span className="location-dialog__icon location-dialog__icon--ring"><LocateFixed size={22} /></span>
             <span>
               <strong>Send your current location</strong>
               <small>{Number.isFinite(coords.accuracy) ? `Accurate to ${Math.round(coords.accuracy)} metres` : ""}</small>
             </span>
           </button>
-          {allowLive ? <button type="button" className="location-dialog__send" onClick={() => setLiveOpen(true)}>
-            <span className="location-dialog__icon location-dialog__icon--live"><Radio size={22} /></span>
-            <span>
-              <strong>Share live location</strong>
-              <small>15 minutes, 1 hour or 8 hours</small>
-            </span>
-          </button> : null}
+          <input
+            className="line-input location-dialog__name"
+            value={name}
+            maxLength={120}
+            placeholder="Add a place name (optional)"
+            aria-label="Place name"
+            onChange={(event) => setName(event.target.value)}
+          />
         </>
       ) : null}
     </Modal>

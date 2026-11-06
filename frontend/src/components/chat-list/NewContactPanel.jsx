@@ -19,11 +19,11 @@ import { useApp } from "../layout/AppContext";
  * re-links this contact to another account — it never changes anybody's
  * account phone number.
  */
-export function ContactForm({ contact, initialPhone = "", onDone, onCancel, openChatOnCreate = true }) {
+export function ContactForm({ contact, initialPhone = "", initialName = "", onDone, onCancel, openChatOnCreate = true }) {
   const isEdit = Boolean(contact);
   // null = not typed yet: the name then follows the person's own profile
   // name (set when they signed up), which you can keep or change.
-  const [typedName, setTypedName] = useState(contact ? contact.name || "" : null);
+  const [typedName, setTypedName] = useState(contact ? contact.name || "" : initialName || null);
   const [phone, setPhone] = useState(contact?.contact_user?.phone_number || initialPhone);
   const debouncedPhone = useDebouncedValue(phone, 450);
   const [busy, setBusy] = useState(false);
@@ -175,7 +175,7 @@ export function ContactForm({ contact, initialPhone = "", onDone, onCancel, open
   );
 }
 
-export default function NewContactPanel({ contact, initialPhone }) {
+export default function NewContactPanel({ contact, initialPhone, initialName }) {
   const app = useApp();
   return (
     <section className="panel">
@@ -184,6 +184,7 @@ export default function NewContactPanel({ contact, initialPhone }) {
         <ContactForm
           contact={contact}
           initialPhone={initialPhone}
+          initialName={initialName}
           onDone={(saved, roomId) => {
             app.popPanel();
             if (roomId) app.openRoom(roomId);

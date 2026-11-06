@@ -652,7 +652,7 @@
 }
 
 .contact-card {
-  min-width: 240px;
+  min-width: 250px;
   margin: -2px -3px 4px;
 }
 .contact-card__main {
@@ -701,8 +701,9 @@
 }
 .contact-card__actions button {
   flex: 1;
-  padding: 9px 4px 3px;
-  color: var(--link);
+  padding: 10px 4px 6px;
+  border-radius: 0 0 6px 6px;
+  color: var(--accent);
   font-size: var(--fs-sm);
   font-weight: 500;
 }
@@ -710,7 +711,7 @@
   border-left: 1px solid var(--hairline);
 }
 .contact-card__actions button:hover {
-  text-decoration: underline;
+  background: var(--soft-fill-hover);
 }
 .bubble--contact {
   padding-bottom: 20px;

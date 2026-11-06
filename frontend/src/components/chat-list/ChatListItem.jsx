@@ -5,6 +5,7 @@ import { callSummary, messageKind, parseSpecial, previewText } from "../../utils
 import { useStore } from "../../store/store";
 import { Avatar, Checkbox, Menu } from "../common/ui";
 import { ringFor, useStatusGroup } from "../status/statusRing";
+import { openProfilePeek, openUserStatus } from "../status/profileOverlay";
 import { requestJoinCall } from "../calls/groupCall";
 import { buildRoomMenu } from "./roomMenu";
 import { ClockIcon, DoubleTick, SingleTick } from "../common/Icons";
@@ -124,7 +125,15 @@ function ChatListItem({
       onTouchEnd={() => window.clearTimeout(pressTimer.current)}
     >
       {selectMode ? <Checkbox checked={selected} onChange={() => onToggleSelect(room.id)} label={`Select ${title}`} /> : null}
-      <span className="avatar-wrap">
+      <span
+        className="avatar-wrap"
+        onClick={(event) => {
+          if (selectMode) return;
+          // WhatsApp: tapping the picture opens their status (ring) or the profile pop-up.
+          event.stopPropagation();
+          if (!(ringFor(statusGroup) && openUserStatus(room.otherUser?.id))) openProfilePeek(room, title, photo);
+        }}
+      >
         <Avatar src={photo} name={title} group={room.isGroup} size={49} ring={ringFor(statusGroup)} />
         {room.disappearingSeconds ? (
           <span className="avatar-timer" aria-label="Disappearing messages on" title="Disappearing messages">

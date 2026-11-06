@@ -1,16 +1,15 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { BarChart3, Camera, FileText, Headphones, Image as ImageIcon, MapPin, Mic, ClipboardPaste, Paperclip, Pencil, Send, Smile, UserRound, X } from "lucide-react";
-import { chatApi, messageApi } from "../../api/endpoints";
-import { errorMessage } from "../../api/client";
+import { chatApi } from "../../api/endpoints";
 import { realtime } from "../../services/realtime";
 import { getNotificationPrefs } from "../../services/notify";
 import { toast } from "../../services/toast";
-import { editMessage, receiveMessage, sendGif, sendLocation, sendPoll, sendSticker, sendText, sendVoice } from "../../store/actions";
+import { editMessage, sendGif, sendLocation, sendPoll, sendSticker, sendText, sendVoice } from "../../store/actions";
 import { useStore } from "../../store/store";
 import { previewText, attachmentKind, profileName, URL_PATTERN } from "../../utils/messages";
 import { openFilePicker } from "../../utils/files";
 import { formatPhone, phoneDigits } from "../../utils/phone";
-import { Avatar, Menu, Modal } from "../common/ui";
+import { Avatar, Menu } from "../common/ui";
 import { useMediaQuery } from "../../hooks";
 import AttachSheet from "./AttachSheet";
 import { readClipboardFiles } from "../../utils/clipboard";
@@ -19,6 +18,7 @@ import { LinkPreviewCard } from "../messages/FeatureCards";
 import EmojiPicker from "./EmojiPicker";
 import { LocationDialog, PollComposerDialog } from "./FeatureDialogs";
 import VoiceRecorder from "./VoiceRecorder";
+import ShareContactDialog from "./ShareContactDialog";
 
 const FIRST_URL = new RegExp(URL_PATTERN.source, "i");
 
@@ -568,40 +568,3 @@ export default function Composer({ room, replyTo, editing, onClearReply, onClear
   );
 }
 
-function ShareContactDialog({ room, onClose }) {
-  const contacts = useStore((state) => state.contacts);
-  const [busy, setBusy] = useState(null);
-  async function share(contact) {
-    setBusy(contact.id);
-    try {
-      const saved = await messageApi.send({
-        room: room.id,
-        message_type: "CONTACT",
-        content: { name: contact.name, phone: contact.contact_user?.phone_number },
-      });
-      receiveMessage(room.id, saved);
-      onClose();
-    } catch (error) {
-      toast.error(errorMessage(error));
-      setBusy(null);
-    }
-  }
-  return (
-    <Modal title="Share contact" onClose={onClose} width={420}>
-      {contacts.length ? (
-        <div className="list-plain">
-          {contacts.map((contact) => (
-            <button key={contact.id} type="button" className="row" disabled={Boolean(busy)} onClick={() => share(contact)}>
-              <span className="row__body">
-                <span className="row__title">{contact.name}</span>
-                <span className="row__subtitle">{formatPhone(contact.contact_user?.phone_number)}</span>
-              </span>
-            </button>
-          ))}
-        </div>
-      ) : (
-        <p className="modal__text">You have no saved contacts to share.</p>
-      )}
-    </Modal>
-  );
-}
