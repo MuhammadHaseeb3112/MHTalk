@@ -1103,7 +1103,7 @@ class UploadMessageSerializer(serializers.Serializer):
         Validate uploaded file: size, emptiness and allowed content types.
         """
 
-        max_size = 25 * 1024 * 1024  # 25 MB
+        max_size = settings.CHAT_MAX_UPLOAD_MB * 1024 * 1024
 
         if not getattr(file, "size", 0):
             raise serializers.ValidationError(
@@ -1112,7 +1112,7 @@ class UploadMessageSerializer(serializers.Serializer):
 
         if file.size > max_size:
             raise serializers.ValidationError(
-                "Maximum file size is 25 MB."
+                f"Maximum file size is {settings.CHAT_MAX_UPLOAD_MB} MB."
             )
 
         content_type = str(getattr(file, "content_type", "") or "").lower()

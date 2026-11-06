@@ -19,6 +19,7 @@ import EmojiPicker from "./EmojiPicker";
 import { LocationDialog, PollComposerDialog } from "./FeatureDialogs";
 import VoiceRecorder from "./VoiceRecorder";
 import ShareContactDialog from "./ShareContactDialog";
+import RichInput from "./RichInput";
 
 const FIRST_URL = new RegExp(URL_PATTERN.source, "i");
 
@@ -270,14 +271,6 @@ export default function Composer({ room, replyTo, editing, onClearReply, onClear
     }
   }
 
-  function onPaste(event) {
-    const files = [...(event.clipboardData?.files || [])];
-    if (files.length) {
-      event.preventDefault();
-      onPickFiles(files.slice(0, MAX_FILES), "media");
-    }
-  }
-
   function insertEmoji(emoji) {
     const node = inputRef.current;
     const start = node?.selectionStart ?? text.length;
@@ -481,16 +474,15 @@ export default function Composer({ room, replyTo, editing, onClearReply, onClear
             >
               <Smile size={23} />
             </button>
-            <textarea
+            <RichInput
               ref={inputRef}
               className="composer__input"
-              rows={1}
               value={text}
               placeholder="Message"
               aria-label="Type a message"
               onChange={onChange}
               onKeyDown={onKeyDown}
-              onPaste={onPaste}
+              onFiles={(files) => onPickFiles(files.slice(0, MAX_FILES), "media")}
               onBlur={() => {
                 stopTyping();
                 setMention(null);

@@ -645,8 +645,8 @@
 .bubble__text--status-emoji {
   display: block;
   padding: 2px 2px 0;
-  font-size: 56px;
-  line-height: 64px;
+  font-size: 38px;
+  line-height: 46px;
   text-align: left;
 }
 .status-reaction__reply {
@@ -902,4 +902,15 @@ mark.search-hit {
 .status-reaction--ref {
   margin: -1px -2px 6px;
   min-width: 220px;
+}
+
+.bubble__read-more {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
 }

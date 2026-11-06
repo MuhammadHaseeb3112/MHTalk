@@ -365,6 +365,9 @@ MHTALK_MAX_PINNED_CHATS = 3
 # Pinned messages per chat (WhatsApp allows 3; pinning another replaces the oldest).
 MHTALK_MAX_PINNED_MESSAGES = 3
 
+# Largest photo / video / document a chat message may carry (Caddy allows 110 MB).
+CHAT_MAX_UPLOAD_MB = config("CHAT_MAX_UPLOAD_MB", default=100, cast=int)
+
 # MHTalk AI (assistant chat). Leave the key empty to turn it off.
 # Providers: gemini (free key, default), groq (free key), openai, anthropic.
 MHTALK_AI_PROVIDER = config("MHTALK_AI_PROVIDER", default="gemini")

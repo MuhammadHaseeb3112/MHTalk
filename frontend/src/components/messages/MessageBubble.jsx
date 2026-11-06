@@ -301,6 +301,31 @@ function CallCard({ event, myId, onCall }) {
   );
 }
 
+const LONG_TEXT = 700;
+
+/** Very long messages show the start and a "Read more" link (WhatsApp). */
+function LongText({ text, expandAll, children }) {
+  const [open, setOpen] = useState(false);
+  if (!text || text.length <= LONG_TEXT + 100 || open || expandAll) return children(text);
+  const cut = text.lastIndexOf(" ", LONG_TEXT);
+  const shown = `${text.slice(0, cut > LONG_TEXT - 120 ? cut : LONG_TEXT).trimEnd()}…`;
+  return (
+    <>
+      {children(shown)}{" "}
+      <button
+        type="button"
+        className="bubble__read-more"
+        onClick={(event) => {
+          event.stopPropagation();
+          setOpen(true);
+        }}
+      >
+        Read more
+      </button>
+    </>
+  );
+}
+
 /** WhatsApp's "Name · Status" card (with a thumbnail of the status). */
 function StatusPreview({ payload, ownerName, onOpen }) {
   const media = payload.status_media ? mediaUrl(payload.status_media) : "";
@@ -388,7 +413,10 @@ function MessageBubble({
   // Touch screens: press and hold a bubble to open its menu.
   const pressRef = useRef(null);
   const cancelPress = () => {
-    if (pressRef.current) window.clearTimeout(pressRef.current.timer);
+    if (pressRef.current) {
+      window.clearTimeout(pressRef.current.timer);
+      window.clearTimeout(pressRef.current.selectTimer);
+    }
     pressRef.current = null;
   };
   // Touch screens, like WhatsApp: press and hold selects the message and
@@ -401,11 +429,19 @@ function MessageBubble({
     pressRef.current = {
       x: touch.clientX,
       y: touch.clientY,
+      // 1) Hold: the reaction bar appears. 2) Keep holding: the message
+      // is selected too (header with reply / star / delete / forward).
       timer: window.setTimeout(() => {
-        pressRef.current = null;
-        navigator.vibrate?.(15);
-        onAction("longPress", message, { anchorEl });
-      }, 450),
+        if (!pressRef.current) return;
+        pressRef.current.reacted = true;
+        navigator.vibrate?.(12);
+        onAction("pressReact", message, { anchorEl });
+        pressRef.current.selectTimer = window.setTimeout(() => {
+          pressRef.current = null;
+          navigator.vibrate?.(18);
+          onAction("longPress", message, { anchorEl });
+        }, 500);
+      }, 400),
     };
   };
   const movePress = (event) => {
@@ -500,7 +536,9 @@ function MessageBubble({
         <>
           {message.link_preview ? <LinkPreviewCard preview={message.link_preview} /> : null}
           <span className={`bubble__text ${emojiOnly ? "bubble__text--emoji" : ""} ${statusEmoji ? "bubble__text--status-emoji" : ""}`}>
-            <RichText text={message.content} query={searchQuery} mentions={mentions} onMention={onMention} />
+            <LongText text={message.content} expandAll={Boolean(searchQuery)}>
+              {(shown) => <RichText text={shown} query={searchQuery} mentions={mentions} onMention={onMention} />}
+            </LongText>
           </span>
         </>
       );

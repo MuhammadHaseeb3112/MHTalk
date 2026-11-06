@@ -3,6 +3,7 @@ import { ArrowLeft, Camera, ClipboardPaste, Image as ImageIcon, Mic, Send, Smile
 import { toast } from "../../services/toast";
 import { readClipboardFiles, shrinkImage } from "../../utils/clipboard";
 import CameraCapture from "../media/CameraCapture";
+import RichInput from "../conversation/RichInput";
 import EmojiPicker from "../conversation/EmojiPicker";
 import { useMediaQuery } from "../../hooks";
 import { clockTime } from "../../utils/format";
@@ -203,19 +204,12 @@ export default function AssistantChat() {
             >
               <Smile size={23} />
             </button>
-            <textarea
+            <RichInput
               ref={inputRef}
               className="composer__input"
-              rows={1}
               value={text}
               onChange={(event) => setText(event.target.value)}
-              onPaste={(event) => {
-                const file = [...(event.clipboardData?.files || [])].find((item) => item.type.startsWith("image/"));
-                if (file) {
-                  event.preventDefault();
-                  attachPhoto(file);
-                }
-              }}
+              onFiles={(files) => attachPhoto(files.find((item) => item.type.startsWith("image/")) || files[0])}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) submit(event);
               }}

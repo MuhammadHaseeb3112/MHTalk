@@ -1,6 +1,7 @@
 import { toast } from "../services/toast";
 
-export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+export const MAX_UPLOAD_MB = 100;
+export const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
 
 /**
  * Validate picked files before previewing/uploading.
@@ -12,7 +13,7 @@ export function validateFiles(files, mode) {
   const problems = [];
   files.forEach((file) => {
     if (!file.size) problems.push(`"${file.name}" is empty`);
-    else if (file.size > MAX_UPLOAD_BYTES) problems.push(`"${file.name}" is larger than 25 MB`);
+    else if (file.size > MAX_UPLOAD_BYTES) problems.push(`"${file.name}" is larger than ${MAX_UPLOAD_MB} MB`);
     else if (mode === "media" && !/^(image|video)\//.test(file.type)) problems.push(`"${file.name}" is not a photo or video`);
     else if (mode === "audio" && !file.type.startsWith("audio/")) problems.push(`"${file.name}" is not an audio file`);
     else accepted.push(file);

@@ -602,3 +602,24 @@
   field-sizing: content;
   max-height: 140px;
 }
+
+/* contentEditable message box (accepts keyboard GIFs / stickers) */
+.rich-input {
+  position: relative;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  cursor: text;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.rich-input.is-empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  pointer-events: none;
+  position: absolute;
+}
+.rich-input img {
+  display: none;
+}

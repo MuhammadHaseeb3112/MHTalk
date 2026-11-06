@@ -220,6 +220,10 @@ export default function Conversation({ roomId }) {
           if (bubble && message.id && isMember && !message.is_deleted) setReacting({ anchor: bubble, message });
           break;
         }
+        case "pressReact":
+          // First stage of press-and-hold: just the reaction bar.
+          if (message.id && isMember && !message.is_deleted) setReacting({ anchor: payload.anchorEl, message, fromPress: true });
+          break;
         case "longPress":
           if (!message.id) return;
           setPressSelect(true);
@@ -250,6 +254,7 @@ export default function Conversation({ roomId }) {
           if (!message.id) return;
           const next = selectedIds.includes(message.id) ? selectedIds.filter((id) => id !== message.id) : [...selectedIds, message.id];
           setSelectedIds(next);
+          if (next.length !== 1) setReacting(null);
           // Unselecting the last message ends a press-and-hold selection (WhatsApp).
           if (!next.length && pressSelect) {
             setPressSelect(false);
@@ -364,6 +369,28 @@ export default function Conversation({ roomId }) {
   const forwardable = selectedMessages.filter((message) => !message.is_view_once);
   const starrable = forwardable;
 
+  const selectionBar = selectMode ? (
+        <div className={`selection-bar ${compact ? "selection-bar--top" : ""}`}>
+          <IconButton icon={X} label="Cancel selection" onClick={() => { setSelectMode(false); setSelectedIds([]); }} />
+          <span className="selection-bar__count">{selectedIds.length} selected</span>
+          <div className="selection-bar__actions">
+            {selectedMessages.length === 1 && isMember && !selectedMessages[0].is_deleted ? (
+              <IconButton icon={Reply} label="Reply" onClick={() => { handleAction("reply", selectedMessages[0]); setSelectMode(false); setSelectedIds([]); }} />
+            ) : null}
+            <IconButton icon={Star} label="Star" disabled={!starrable.length} onClick={() => toggleStar(roomId, starrable, !starrable.every((m) => m.is_starred))} />
+            <IconButton icon={Copy} label="Copy" disabled={!selectedIds.length} onClick={() => {
+              const text = selectedMessages.filter((m) => m.content && typeof m.content === "string" && !m.content.startsWith("__MHTALK_")).map((m) => m.content).join("\n");
+              if (text) navigator.clipboard?.writeText(text).then(() => toast("Copied"));
+            }} />
+            <IconButton icon={Forward} label="Forward" disabled={!forwardable.length || forwardable.length !== selectedMessages.length} onClick={() => setDialog({ type: "forward", messages: forwardable })} />
+            <IconButton icon={Trash2} label={canDeleteForEveryone(selectedMessages, me.id) ? "Delete" : "Delete for me"} disabled={!selectedIds.length} onClick={() => setDialog({ type: "delete", messages: selectedMessages })} />
+            {selectedMessages.length === 1 ? (
+              <IconButton icon={MoreVertical} label="More" onClick={(event) => setMenu({ anchor: event.currentTarget, message: selectedMessages[0], fromSelection: true })} />
+            ) : null}
+          </div>
+        </div>
+  ) : null;
+
   return (
     <section
       className={`conversation ${composerFiles || camera ? "has-media-composer" : ""}`}
@@ -389,7 +416,9 @@ export default function Conversation({ roomId }) {
         });
       }}
     >
+      {selectMode && compact ? selectionBar : null}
       <ConversationHeader
+        hidden={selectMode && compact}
         room={room}
         title={title}
         compact={compact}
@@ -469,26 +498,8 @@ export default function Conversation({ roomId }) {
         ) : null}
       </div>
 
-      {selectMode ? (
-        <div className="selection-bar">
-          <IconButton icon={X} label="Cancel selection" onClick={() => { setSelectMode(false); setSelectedIds([]); }} />
-          <span className="selection-bar__count">{selectedIds.length} selected</span>
-          <div className="selection-bar__actions">
-            {selectedMessages.length === 1 && isMember && !selectedMessages[0].is_deleted ? (
-              <IconButton icon={Reply} label="Reply" onClick={() => { handleAction("reply", selectedMessages[0]); setSelectMode(false); setSelectedIds([]); }} />
-            ) : null}
-            <IconButton icon={Star} label="Star" disabled={!starrable.length} onClick={() => toggleStar(roomId, starrable, !starrable.every((m) => m.is_starred))} />
-            <IconButton icon={Copy} label="Copy" disabled={!selectedIds.length} onClick={() => {
-              const text = selectedMessages.filter((m) => m.content && typeof m.content === "string" && !m.content.startsWith("__MHTALK_")).map((m) => m.content).join("\n");
-              if (text) navigator.clipboard?.writeText(text).then(() => toast("Copied"));
-            }} />
-            <IconButton icon={Forward} label="Forward" disabled={!forwardable.length || forwardable.length !== selectedMessages.length} onClick={() => setDialog({ type: "forward", messages: forwardable })} />
-            <IconButton icon={Trash2} label={canDeleteForEveryone(selectedMessages, me.id) ? "Delete" : "Delete for me"} disabled={!selectedIds.length} onClick={() => setDialog({ type: "delete", messages: selectedMessages })} />
-            {selectedMessages.length === 1 ? (
-              <IconButton icon={MoreVertical} label="More" onClick={(event) => setMenu({ anchor: event.currentTarget, message: selectedMessages[0], fromSelection: true })} />
-            ) : null}
-          </div>
-        </div>
+      {selectMode && !compact ? (
+        selectionBar
       ) : (
         <Composer
           key={roomId}
