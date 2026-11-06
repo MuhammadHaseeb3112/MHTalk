@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Clock3, Smile, Sticker } from "lucide-react";
+import { Clock3, Delete, Smile, Sticker } from "lucide-react";
 import { GifPanel, StickerPanel } from "./GifStickerPanels";
 import { useDismiss } from "../../hooks";
 import { EMOJI_CATEGORIES, recentEmoji, rememberEmoji, searchEmoji } from "../../utils/emoji";
@@ -9,7 +9,7 @@ import { SearchInput } from "../common/ui";
  * Emoji panel with category tabs, keyword search and recents.
  * Closes on outside click / Escape (and unmounts when the chat changes).
  */
-export default function EmojiPicker({ onPick, onGif = null, onSticker = null, onClose, className = "", ignoreRefs = [] }) {
+export default function EmojiPicker({ onPick, onGif = null, onSticker = null, onBackspace = null, onClose, className = "", ignoreRefs = [] }) {
   const [mode, setMode] = useState("emoji"); // emoji | gif | sticker (chat composer only)
   const ref = useRef(null);
   const gridRef = useRef(null);
@@ -61,6 +61,11 @@ export default function EmojiPicker({ onPick, onGif = null, onSticker = null, on
       {onSticker ? (
         <button type="button" role="tab" aria-selected={mode === "sticker"} className={mode === "sticker" ? "is-active" : ""} onClick={() => setMode("sticker")} aria-label="Stickers">
           <Sticker size={20} />
+        </button>
+      ) : null}
+      {onBackspace && mode === "emoji" ? (
+        <button type="button" className="emoji-picker__backspace" aria-label="Delete" onClick={onBackspace}>
+          <Delete size={20} />
         </button>
       ) : null}
     </div>

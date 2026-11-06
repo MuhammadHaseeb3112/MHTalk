@@ -91,7 +91,8 @@ export default function ShareContactDialog({ room, onClose }) {
       <div className="share-contact__bar">
         <button type="button" className="icon-btn" aria-label="Close" onClick={onClose}><X size={22} /></button>
         <div className="share-contact__title">
-          <h2>Contacts to send</h2>
+          <h2 className="share-contact__title-mobile">Contacts to send</h2>
+          <h2 className="share-contact__title-desktop">Send contacts</h2>
           <small>{picked.length} selected</small>
         </div>
       </div>
@@ -112,15 +113,22 @@ export default function ShareContactDialog({ room, onClose }) {
       ) : null}
       <div className="share-contact__list" role="listbox" aria-multiselectable="true">
         {people.length ? (
-          people.map((person) => (
-            <button key={person.id} type="button" role="option" aria-selected={isPicked(person)} className="share-contact__row" onClick={() => toggle(person)}>
-              <Avatar src={person.photo} name={person.name} size={44} />
-              <span className="share-contact__text">
-                <strong>{person.name}{person.self ? " (You)" : ""}</strong>
-                <small>{formatPhone(person.phone)}</small>
-              </span>
-              <Checkbox checked={isPicked(person)} label={`Select ${person.name}`} decorative />
-            </button>
+          people.map((person, index) => (
+            <div key={person.id} className="share-contact__group">
+              {index === 0 && person.self ? <p className="share-contact__section">You</p> : null}
+              {!person.self && (index === 0 || people[index - 1].self) ? <p className="share-contact__section">Contacts on MHTalk</p> : null}
+              <button type="button" role="option" aria-selected={isPicked(person)} className="share-contact__row" onClick={() => toggle(person)}>
+                <Checkbox checked={isPicked(person)} label={`Select ${person.name}`} decorative />
+                <span className="share-contact__avatar">
+                  <Avatar src={person.photo} name={person.name} size={46} />
+                  {isPicked(person) ? <span className="share-contact__tick" aria-hidden="true">✓</span> : null}
+                </span>
+                <span className="share-contact__text">
+                  <strong>{person.name}{person.self ? " (You)" : ""}</strong>
+                  <small>{formatPhone(person.phone)}</small>
+                </span>
+              </button>
+            </div>
           ))
         ) : (
           <p className="modal__text share-contact__empty">{query ? "No contacts found." : "You have no saved contacts to share."}</p>

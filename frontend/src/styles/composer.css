@@ -623,3 +623,36 @@
 .rich-input img {
   display: none;
 }
+
+/* Phones: emoji / GIF / sticker panel sits under the message box, in the
+   keyboard's place (WhatsApp). */
+.emoji-picker--dock {
+  position: relative;
+  width: 100%;
+  max-width: none;
+  height: min(42dvh, 320px);
+  margin-top: 6px;
+  border-radius: 0;
+  box-shadow: none;
+  animation: none;
+  background: var(--panel, var(--menu-bg));
+}
+.emoji-picker--dock .emoji-picker__modes {
+  position: relative;
+  width: calc(100% - 24px);
+  justify-content: center;
+}
+.emoji-picker__backspace {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 34px;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}

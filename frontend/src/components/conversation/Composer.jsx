@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, Camera, FileText, Headphones, Image as ImageIcon, MapPin, Mic, ClipboardPaste, Paperclip, Pencil, Send, Smile, UserRound, X } from "lucide-react";
+import { BarChart3, Camera, FileText, Headphones, Image as ImageIcon, MapPin, Mic, ClipboardPaste, Keyboard, Paperclip, Pencil, Send, Smile, UserRound, X } from "lucide-react";
 import { chatApi } from "../../api/endpoints";
 import { realtime } from "../../services/realtime";
 import { getNotificationPrefs } from "../../services/notify";
@@ -43,6 +43,7 @@ const MAX_FILES = 30;
 export default function Composer({ room, replyTo, editing, onClearReply, onClearEdit, onPickFiles, onOpenCamera, nameOf, blocked, disabledReason }) {
   const [text, setText] = useState(() => drafts.get(room.id) || "");
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const caretRef = useRef(null);
   const [attachAnchor, setAttachAnchor] = useState(null);
   const [attachSheet, setAttachSheet] = useState(false);
   const isMobile = useMediaQuery("(max-width: 700px)");
@@ -273,6 +274,14 @@ export default function Composer({ room, replyTo, editing, onClearReply, onClear
 
   function insertEmoji(emoji) {
     const node = inputRef.current;
+    // Phone with the emoji panel docked: keep the keyboard closed and add
+    // the emoji where the cursor was, like WhatsApp.
+    if (isMobile && emojiOpen) {
+      const at = Math.min(caretRef.current ?? text.length, text.length);
+      setText(text.slice(0, at) + emoji + text.slice(at));
+      caretRef.current = at + emoji.length;
+      return;
+    }
     const start = node?.selectionStart ?? text.length;
     const end = node?.selectionEnd ?? text.length;
     const next = text.slice(0, start) + emoji + text.slice(end);
@@ -281,6 +290,26 @@ export default function Composer({ room, replyTo, editing, onClearReply, onClear
       node?.focus();
       node?.setSelectionRange(start + emoji.length, start + emoji.length);
     });
+  }
+
+  function toggleEmojiPanel() {
+    if (emojiOpen) {
+      setEmojiOpen(false);
+      if (isMobile) {
+        // Keyboard button: back to typing.
+        const at = caretRef.current;
+        window.requestAnimationFrame(() => {
+          inputRef.current?.focus();
+          if (at != null) inputRef.current?.setSelectionRange(at, at);
+        });
+      }
+      return;
+    }
+    if (isMobile) {
+      caretRef.current = inputRef.current?.selectionStart ?? text.length;
+      inputRef.current?.blur(); // hide the phone keyboard, show the panel in its place
+    }
+    setEmojiOpen(true);
   }
 
   function handleFiles(kind) {
@@ -422,6 +451,21 @@ export default function Composer({ room, replyTo, editing, onClearReply, onClear
     </div>
   ) : null;
 
+  const attachButton = (
+    <button
+              type="button"
+              className={`icon-btn ${attachAnchor || attachSheet ? "is-active" : ""}`}
+              aria-label="Attach"
+              onClick={(event) => {
+                if (isMobile) setAttachSheet(true);
+                else setAttachAnchor(attachAnchor ? null : event.currentTarget);
+              }}
+              disabled={Boolean(editing)}
+            >
+              <Paperclip size={22} className="composer__clip" />
+            </button>
+  );
+
   return (
     <footer className="composer">
       {mentionPicker}
@@ -438,7 +482,7 @@ export default function Composer({ room, replyTo, editing, onClearReply, onClear
           />
         </div>
       ) : null}
-      {emojiOpen ? <EmojiPicker
+      {emojiOpen && !isMobile ? <EmojiPicker
           className="emoji-picker--composer"
           onPick={insertEmoji}
           onGif={(gif) => {
@@ -465,14 +509,15 @@ export default function Composer({ room, replyTo, editing, onClearReply, onClear
       ) : (
         <div className="composer__row">
           <div className="composer__pill">
+            {isMobile ? null : attachButton}
             <button
               ref={emojiBtnRef}
               type="button"
               className={`icon-btn ${emojiOpen ? "is-active" : ""}`}
-              aria-label="Emoji, GIFs and stickers"
-              onClick={() => setEmojiOpen((value) => !value)}
+              aria-label={isMobile && emojiOpen ? "Keyboard" : "Emoji, GIFs and stickers"}
+              onClick={toggleEmojiPanel}
             >
-              <Smile size={23} />
+              {isMobile && emojiOpen ? <Keyboard size={23} /> : <Smile size={23} />}
             </button>
             <RichInput
               ref={inputRef}
@@ -483,24 +528,17 @@ export default function Composer({ room, replyTo, editing, onClearReply, onClear
               onChange={onChange}
               onKeyDown={onKeyDown}
               onFiles={(files) => onPickFiles(files.slice(0, MAX_FILES), "media")}
+              onFocus={() => {
+                if (isMobile && emojiOpen) setEmojiOpen(false);
+              }}
               onBlur={() => {
+                caretRef.current = inputRef.current?.selectionStart ?? null;
                 stopTyping();
                 setMention(null);
               }}
               maxLength={65000}
             />
-            <button
-              type="button"
-              className={`icon-btn ${attachAnchor || attachSheet ? "is-active" : ""}`}
-              aria-label="Attach"
-              onClick={(event) => {
-                if (isMobile) setAttachSheet(true);
-                else setAttachAnchor(attachAnchor ? null : event.currentTarget);
-              }}
-              disabled={Boolean(editing)}
-            >
-              <Paperclip size={22} className="composer__clip" />
-            </button>
+            {isMobile ? attachButton : null}
             {!text.trim() && onOpenCamera ? (
               <button type="button" className="icon-btn" aria-label="Camera" onClick={onOpenCamera} disabled={Boolean(editing)}>
                 <Camera size={22} />
@@ -554,6 +592,31 @@ export default function Composer({ room, replyTo, editing, onClearReply, onClear
               if (location.live_seconds && saved?.id) startLiveLocation(room.id, saved);
             });
           }}
+        />
+      ) : null}
+      {emojiOpen && isMobile ? (
+        <EmojiPicker
+          className="emoji-picker--dock"
+          onPick={insertEmoji}
+          onGif={(gif) => {
+            sendGif(room.id, gif, replyTo);
+            if (replyTo) onClearReply();
+          }}
+          onSticker={(file) => {
+            sendSticker(room.id, file, replyTo);
+            if (replyTo) onClearReply();
+          }}
+          onBackspace={() => {
+            const at = Math.min(caretRef.current ?? text.length, text.length);
+            if (!at) return;
+            const chars = [...text.slice(0, at)];
+            chars.pop();
+            const head = chars.join("");
+            setText(head + text.slice(at));
+            caretRef.current = head.length;
+          }}
+          onClose={() => setEmojiOpen(false)}
+          ignoreRefs={[emojiBtnRef]}
         />
       ) : null}
     </footer>
