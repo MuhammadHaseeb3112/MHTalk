@@ -165,9 +165,26 @@ days). Run it every night at 03:00: `mkdir -p ~/backups`, then `crontab -e` and 
 0 3 * * * cd ~/mhtalk && bash deploy/backup.sh >> ~/backups/backup.log 2>&1
 ```
 
+The script also archives uploaded files (photos, videos, voice notes) every
+Sunday (`BACKUP_MEDIA_NOW=1 bash deploy/backup.sh` makes one now).
+
 **Copy backups off the server.** A backup on the same machine is lost with the
 machine. Oracle's Always Free tier includes 20 GB of Object Storage, which is
-separate from the VM:
+separate from the VM.
+
+Simplest way (no keys, nothing to install):
+
+1. Console → ☰ → **Storage → Buckets → Create bucket**, name `mhtalk-backups`
+   (Standard tier, private).
+2. Open the bucket → **Pre-authenticated requests → Create pre-authenticated
+   request**: target *Bucket*, access *Permit object writes*, expiration a few
+   years ahead. Copy the URL (shown once; it ends in `/o/`).
+3. In `.env.prod` set `BACKUP_UPLOAD_URL=<that URL>`, then test with
+   `bash deploy/backup.sh`; the files appear in the bucket's *Objects* list.
+   Old copies in the bucket are not deleted automatically; delete them from
+   the console now and then (or add a lifecycle rule).
+
+Or with rclone (can also delete old copies):
 
 1. Console → ☰ → **Storage → Buckets → Create bucket**, name `mhtalk-backups`
    (Standard tier, private).
