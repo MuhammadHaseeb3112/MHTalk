@@ -1,5 +1,18 @@
 [
   {
+    "version": "1.39.0",
+    "date": "2026-11-07",
+    "title": "Sticker packs, better emoji & GIF search, update card",
+    "items": [
+      "Ready sticker packs for everyone: MHTalk Buddy, Kitty and \"Say it\" (Salam, Shukriya, InshaAllah, LOL…).",
+      "Search stickers by word: love, lol, salam, sad…",
+      "Emoji search now finds every emoji (try \"cry\", \"red heart\", \"pizza\").",
+      "GIF tab has quick chips: Haha, Love, Sad, Wow, Party and more.",
+      "New versions show a small card: Update now or Later. It hides by itself after a few seconds and stays in Settings → App update.",
+      "Installed app: share photos, videos, GIFs or stickers from other apps (Share → MHTalk) and pick the chats to send to."
+    ]
+  },
+  {
     "version": "1.38.0",
     "date": "2026-11-06",
     "title": "Trim videos, GIF & sticker favourites, new status screen",

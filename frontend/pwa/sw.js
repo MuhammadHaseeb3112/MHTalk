@@ -10,6 +10,9 @@
  * - A new build waits until the page asks it to take over ("New version
  *   available — Reload" toast posts SKIP_WAITING).
  * - Web Push: shows message / call notifications and deep-links on click.
+ * - Share target: files shared to the installed app ("Share → MHTalk", also
+ *   Gboard's GIF/sticker fallback) are parked in a cache and the app opens
+ *   "Send to…" (see ShareReceiver.jsx).
  */
 
 const VERSION = "__MHTALK_SW_VERSION__";
@@ -43,10 +46,16 @@ self.addEventListener("message", (event) => {
   if (event.data?.type === "GET_VERSION") event.source?.postMessage({ type: "VERSION", version: VERSION });
 });
 
+const SHARE_CACHE = "mhtalk-share";
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
-  if (request.method !== "GET") return;
   const url = new URL(request.url);
+  if (request.method === "POST" && url.origin === self.location.origin && url.pathname === "/share-target") {
+    event.respondWith(handleShare(request));
+    return;
+  }
+  if (request.method !== "GET") return;
   if (url.origin !== self.location.origin || BYPASS.test(url.pathname)) return;
   if (request.headers.get("range")) return;
 
@@ -56,6 +65,31 @@ self.addEventListener("fetch", (event) => {
   }
   event.respondWith(handleAsset(request));
 });
+
+async function handleShare(request) {
+  try {
+    const form = await request.formData();
+    const cache = await caches.open(SHARE_CACHE);
+    for (const key of await cache.keys()) await cache.delete(key);
+    const files = form.getAll("media").filter((item) => item && typeof item === "object" && item.size);
+    const meta = {
+      at: Date.now(),
+      title: String(form.get("title") || ""),
+      text: String(form.get("text") || ""),
+      url: String(form.get("url") || ""),
+      files: files.map((file, index) => ({ key: `/__share/${index}`, name: file.name || `shared-${index}`, type: file.type || "" })),
+    };
+    await Promise.all(
+      files.map((file, index) =>
+        cache.put(`/__share/${index}`, new Response(file, { headers: { "content-type": file.type || "application/octet-stream" } })),
+      ),
+    );
+    await cache.put("/__share/meta", new Response(JSON.stringify(meta), { headers: { "content-type": "application/json" } }));
+  } catch {
+    /* nothing to share */
+  }
+  return Response.redirect("/?share=1", 303);
+}
 
 async function handleNavigation(request) {
   const cache = await caches.open(CACHE);

@@ -702,3 +702,111 @@
   color: var(--text, #e9edef);
   border: 1px solid var(--hairline, #3b4a54);
 }
+
+/* "New version" card */
+.update-prompt {
+  position: fixed;
+  left: 50%;
+  bottom: calc(84px + env(safe-area-inset-bottom));
+  z-index: 80;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: min(440px, calc(100vw - 24px));
+  padding: 14px 40px 14px 14px;
+  border-radius: 16px;
+  background: var(--panel-raised, var(--menu-bg));
+  color: var(--text);
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.35);
+  transform: translateX(-50%);
+  animation: update-in 0.25s ease-out;
+}
+@keyframes update-in {
+  from { opacity: 0; transform: translate(-50%, 16px); }
+}
+.update-prompt__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--badge-text, #fff);
+}
+.update-prompt__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.update-prompt__text span {
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+}
+.update-prompt__link {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.update-prompt__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-self: center;
+}
+.update-prompt__actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 17px;
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.update-prompt__now {
+  border: 0;
+  background: var(--accent);
+  color: var(--badge-text, #fff);
+}
+.update-prompt__later {
+  border: 1px solid var(--hairline);
+  background: none;
+  color: var(--text);
+}
+.update-prompt__close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+@media (min-width: 901px) {
+  .update-prompt {
+    left: auto;
+    right: 24px;
+    bottom: 24px;
+    transform: none;
+  }
+  @keyframes update-in {
+    from { opacity: 0; transform: translateY(16px); }
+  }
+}

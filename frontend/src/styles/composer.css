@@ -663,3 +663,49 @@
   font-size: var(--fs-sm);
   font-weight: 500;
 }
+
+/* Sticker tab: pack tabs like WhatsApp */
+.sticker-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 2px 10px 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--hairline);
+}
+.sticker-tabs button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 42px;
+  height: 38px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.sticker-tabs button img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+.sticker-tabs button.is-active {
+  background: var(--soft-fill-hover, rgba(127, 127, 127, 0.16));
+  color: var(--accent);
+}
+.gif-chips {
+  display: flex;
+  gap: 6px;
+  padding: 0 10px 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.gif-chips .chip {
+  flex: none;
+}
+.gif-grid .emoji-picker__empty,
+.gif-grid .gif-grid__status,
+.gif-grid .gif-grid__credit {
+  column-span: all;
+}

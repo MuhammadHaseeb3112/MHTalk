@@ -17,6 +17,8 @@ import { CallProvider } from "../calls/CallManager";
 import { AppContext } from "./AppContext";
 import IntroPane from "./IntroPane";
 import ProfileOverlays from "../status/ProfileOverlays";
+import UpdatePrompt from "../common/UpdatePrompt";
+import ShareReceiver from "../common/ShareReceiver";
 import { Spinner } from "../common/ui";
 
 // Less-used screens load on demand to keep the first download small.
@@ -237,6 +239,8 @@ export default function MainLayout({ onLogout }) {
           </Suspense>
         ) : null}
         <ProfileOverlays />
+        <UpdatePrompt />
+        <ShareReceiver />
       </CallProvider>
     </AppContext.Provider>
   );

@@ -1,8 +1,8 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Clock3, Delete, Smile, Sticker } from "lucide-react";
 import { GifPanel, StickerPanel } from "./GifStickerPanels";
 import { useDismiss } from "../../hooks";
-import { EMOJI_CATEGORIES, recentEmoji, rememberEmoji, searchEmoji } from "../../utils/emoji";
+import { EMOJI_CATEGORIES, loadEmojiKeywords, recentEmoji, rememberEmoji, searchEmoji } from "../../utils/emoji";
 import { SearchInput } from "../common/ui";
 
 /**
@@ -18,7 +18,19 @@ export default function EmojiPicker({ onPick, onGif = null, onSticker = null, on
   const [activeTab, setActiveTab] = useState(recent.length ? "recent" : EMOJI_CATEGORIES[0].id);
   useDismiss([ref, ...ignoreRefs], onClose);
 
-  const results = useMemo(() => (query ? searchEmoji(query) : null), [query]);
+  // Full keyword list (every emoji) loads the first time someone searches.
+  const [library, setLibrary] = useState(null);
+  useEffect(() => {
+    if (!query || library) return;
+    let cancelled = false;
+    loadEmojiKeywords()
+      .then((loaded) => !cancelled && setLibrary(loaded))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [query, library]);
+  const results = useMemo(() => (query ? searchEmoji(query, library) : null), [query, library]);
 
   function pick(emoji) {
     rememberEmoji(emoji);

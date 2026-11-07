@@ -100,13 +100,39 @@ export function rememberEmoji(emoji) {
   }
 }
 
-export function searchEmoji(query) {
-  const needle = query.trim().toLowerCase();
-  if (!needle) return [];
-  const results = Object.entries(EMOJI_KEYWORDS)
-    .filter(([, words]) => words.includes(needle))
-    .map(([emoji]) => emoji);
-  return [...new Set(results)];
+let keywordLibrary = null;
+
+/** Full English keyword list for every emoji (emojilib), loaded on first search. */
+export async function loadEmojiKeywords() {
+  if (!keywordLibrary) keywordLibrary = (await import("emojilib")).default;
+  return keywordLibrary;
+}
+
+/**
+ * Emoji whose names / keywords start with every word typed ("cry", "red
+ * heart", "thumbs"). Works with the small built-in list straight away and
+ * with the full library once ``library`` has loaded.
+ */
+export function searchEmoji(query, library = keywordLibrary) {
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const scored = [];
+  const seen = new Set();
+  const consider = (emoji, keywords) => {
+    if (seen.has(emoji)) return;
+    const tokens = keywords.flatMap((keyword) => keyword.toLowerCase().split(/[_\s-]+/));
+    let score = 0;
+    for (const word of words) {
+      if (tokens.includes(word)) score += 3;
+      else if (tokens.some((token) => token.startsWith(word))) score += 1;
+      else return;
+    }
+    seen.add(emoji);
+    scored.push([emoji, score]);
+  };
+  Object.entries(EMOJI_KEYWORDS).forEach(([emoji, keywords]) => consider(emoji, Array.isArray(keywords) ? keywords : String(keywords).split(/\s+/)));
+  if (library) Object.entries(library).forEach(([emoji, keywords]) => consider(emoji, keywords));
+  return scored.sort((a, b) => b[1] - a[1]).slice(0, 160).map(([emoji]) => emoji);
 }
 
 export const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];

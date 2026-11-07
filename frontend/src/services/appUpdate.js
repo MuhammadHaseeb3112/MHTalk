@@ -9,7 +9,8 @@ import NOTES from "../releaseNotes.json";
 export const RELEASES = NOTES;
 export const APP_VERSION = NOTES[0]?.version || "1.0.0";
 
-let state = { available: false, latest: null, releases: NOTES, waiting: null, checking: false };
+let state = { available: false, latest: null, releases: NOTES, waiting: null, checking: false, prompt: false };
+let promptTimer = null;
 let openRequested = false;
 const listeners = new Set();
 
@@ -47,6 +48,7 @@ export async function checkForUpdate() {
       const latest = releases[0];
       const isNewer = newer(latest.version, APP_VERSION);
       set({ releases, latest: isNewer ? latest : null, available: isNewer || Boolean(state.waiting) });
+      if (isNewer) showUpdatePrompt(latest.version);
     }
   } catch {
     /* offline: try again later */
@@ -59,7 +61,29 @@ export async function checkForUpdate() {
 /** The service worker has the new files downloaded and is waiting. */
 export function setWaitingWorker(worker) {
   set({ waiting: worker, available: true });
+  showUpdatePrompt("waiting");
   checkForUpdate();
+}
+
+/**
+ * The small "Update available" card: shown once per new version, hides
+ * itself after 12 seconds or on "Later" (Settings keeps the green dot).
+ */
+export function showUpdatePrompt(key) {
+  try {
+    if (sessionStorage.getItem("mhtalk_update_prompted") === String(key)) return;
+    sessionStorage.setItem("mhtalk_update_prompted", String(key));
+  } catch {
+    /* private mode */
+  }
+  window.clearTimeout(promptTimer);
+  set({ prompt: true });
+  promptTimer = window.setTimeout(() => set({ prompt: false }), 12000);
+}
+
+export function hideUpdatePrompt() {
+  window.clearTimeout(promptTimer);
+  set({ prompt: false });
 }
 
 let reloadHook = null;

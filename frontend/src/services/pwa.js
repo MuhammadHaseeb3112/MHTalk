@@ -5,8 +5,7 @@
  *   - turns service-worker notification clicks into "mhtalk:open-room",
  *   - keeps the browser's install prompt for Settings → "Install app".
  */
-import { toast } from "./toast";
-import { onApplyReload, requestOpenUpdate, setWaitingWorker } from "./appUpdate";
+import { onApplyReload, setWaitingWorker } from "./appUpdate";
 
 const installListeners = new Set();
 let deferredPrompt = null;
@@ -71,10 +70,6 @@ function promptUpdate(worker) {
   setWaitingWorker(worker);
   onApplyReload(() => {
     reloading = true;
-  });
-  toast("A new version of MHTalk is ready", {
-    duration: 8000,
-    action: { label: "What's new", onClick: requestOpenUpdate },
   });
 }
 

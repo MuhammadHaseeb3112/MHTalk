@@ -1,0 +1,230 @@
+{
+ "packs": [
+  {
+   "id": "buddy",
+   "name": "MHTalk Buddy",
+   "icon": "/stickers/buddy/hello.webp",
+   "stickers": [
+    {
+     "id": "buddy/hello",
+     "file": "/stickers/buddy/hello.webp",
+     "tags": "hi hello wave salam"
+    },
+    {
+     "id": "buddy/happy",
+     "file": "/stickers/buddy/happy.webp",
+     "tags": "happy smile glad"
+    },
+    {
+     "id": "buddy/lol",
+     "file": "/stickers/buddy/lol.webp",
+     "tags": "lol haha laugh funny joy"
+    },
+    {
+     "id": "buddy/love",
+     "file": "/stickers/buddy/love.webp",
+     "tags": "love heart hearts cute"
+    },
+    {
+     "id": "buddy/kiss",
+     "file": "/stickers/buddy/kiss.webp",
+     "tags": "kiss love mwah"
+    },
+    {
+     "id": "buddy/wow",
+     "file": "/stickers/buddy/wow.webp",
+     "tags": "wow surprised shock omg"
+    },
+    {
+     "id": "buddy/sad",
+     "file": "/stickers/buddy/sad.webp",
+     "tags": "sad cry upset"
+    },
+    {
+     "id": "buddy/crying",
+     "file": "/stickers/buddy/crying.webp",
+     "tags": "crying cry tears sob"
+    },
+    {
+     "id": "buddy/angry",
+     "file": "/stickers/buddy/angry.webp",
+     "tags": "angry mad gussa"
+    },
+    {
+     "id": "buddy/cool",
+     "file": "/stickers/buddy/cool.webp",
+     "tags": "cool sunglasses swag"
+    },
+    {
+     "id": "buddy/sleepy",
+     "file": "/stickers/buddy/sleepy.webp",
+     "tags": "sleep sleepy tired good night"
+    },
+    {
+     "id": "buddy/thinking",
+     "file": "/stickers/buddy/thinking.webp",
+     "tags": "thinking hmm question"
+    },
+    {
+     "id": "buddy/party",
+     "file": "/stickers/buddy/party.webp",
+     "tags": "party celebrate birthday"
+    },
+    {
+     "id": "buddy/thumbs-up",
+     "file": "/stickers/buddy/thumbs-up.webp",
+     "tags": "ok thumbs up yes good"
+    },
+    {
+     "id": "buddy/awkward",
+     "file": "/stickers/buddy/awkward.webp",
+     "tags": "awkward oops sorry"
+    }
+   ]
+  },
+  {
+   "id": "kitty",
+   "name": "Kitty",
+   "icon": "/stickers/kitty/hi.webp",
+   "stickers": [
+    {
+     "id": "kitty/hi",
+     "file": "/stickers/kitty/hi.webp",
+     "tags": "hi hello cat kitty"
+    },
+    {
+     "id": "kitty/purr",
+     "file": "/stickers/kitty/purr.webp",
+     "tags": "happy cat purr"
+    },
+    {
+     "id": "kitty/lol",
+     "file": "/stickers/kitty/lol.webp",
+     "tags": "lol laugh cat"
+    },
+    {
+     "id": "kitty/love",
+     "file": "/stickers/kitty/love.webp",
+     "tags": "love cat heart"
+    },
+    {
+     "id": "kitty/shock",
+     "file": "/stickers/kitty/shock.webp",
+     "tags": "wow shock cat"
+    },
+    {
+     "id": "kitty/sad",
+     "file": "/stickers/kitty/sad.webp",
+     "tags": "sad cat cry"
+    },
+    {
+     "id": "kitty/grumpy",
+     "file": "/stickers/kitty/grumpy.webp",
+     "tags": "angry grumpy cat"
+    },
+    {
+     "id": "kitty/sleepy",
+     "file": "/stickers/kitty/sleepy.webp",
+     "tags": "sleep cat night"
+    },
+    {
+     "id": "kitty/cool",
+     "file": "/stickers/kitty/cool.webp",
+     "tags": "cool cat"
+    },
+    {
+     "id": "kitty/wink",
+     "file": "/stickers/kitty/wink.webp",
+     "tags": "wink cat"
+    }
+   ]
+  },
+  {
+   "id": "words",
+   "name": "Say it",
+   "icon": "/stickers/words/salam.webp",
+   "stickers": [
+    {
+     "id": "words/salam",
+     "file": "/stickers/words/salam.webp",
+     "tags": "salam hello assalam"
+    },
+    {
+     "id": "words/hi",
+     "file": "/stickers/words/hi.webp",
+     "tags": "hi hello hey"
+    },
+    {
+     "id": "words/thank-you",
+     "file": "/stickers/words/thank-you.webp",
+     "tags": "thanks thank you shukriya"
+    },
+    {
+     "id": "words/shukriya",
+     "file": "/stickers/words/shukriya.webp",
+     "tags": "shukriya thanks"
+    },
+    {
+     "id": "words/ok",
+     "file": "/stickers/words/ok.webp",
+     "tags": "ok okay fine done"
+    },
+    {
+     "id": "words/lol",
+     "file": "/stickers/words/lol.webp",
+     "tags": "lol haha funny"
+    },
+    {
+     "id": "words/haha",
+     "file": "/stickers/words/haha.webp",
+     "tags": "haha lol laugh"
+    },
+    {
+     "id": "words/wow",
+     "file": "/stickers/words/wow.webp",
+     "tags": "wow amazing"
+    },
+    {
+     "id": "words/good-night",
+     "file": "/stickers/words/good-night.webp",
+     "tags": "good night sleep"
+    },
+    {
+     "id": "words/good-morning",
+     "file": "/stickers/words/good-morning.webp",
+     "tags": "good morning"
+    },
+    {
+     "id": "words/miss-you",
+     "file": "/stickers/words/miss-you.webp",
+     "tags": "miss you love"
+    },
+    {
+     "id": "words/on-my-way",
+     "file": "/stickers/words/on-my-way.webp",
+     "tags": "on my way coming"
+    },
+    {
+     "id": "words/inshallah",
+     "file": "/stickers/words/inshallah.webp",
+     "tags": "inshallah"
+    },
+    {
+     "id": "words/mashallah",
+     "file": "/stickers/words/mashallah.webp",
+     "tags": "mashallah"
+    },
+    {
+     "id": "words/ameen",
+     "file": "/stickers/words/ameen.webp",
+     "tags": "ameen amen"
+    },
+    {
+     "id": "words/congrats",
+     "file": "/stickers/words/congrats.webp",
+     "tags": "congrats congratulations mubarak"
+    }
+   ]
+  }
+ ]
+}
