@@ -1,12 +1,18 @@
 <div align="center">
 
-# 💬 MHTalk
+<img src="frontend/public/pwa-192.png" alt="MHTalk logo" width="88">
 
-**A production-grade, real-time messenger modelled on WhatsApp Web and WhatsApp for Android.**
+# MHTalk
 
-Chats, groups, voice and video calls (including group calls), status updates, polls, view once and disappearing messages, push notifications, and an installable app, built end to end with Django, Channels, PostgreSQL, Redis, React and WebRTC, tested, and deployed with Docker.
+### A real-time messenger in the style of WhatsApp, built and run in production by one developer
+
+Chats · groups · voice and video calls · status · stickers and GIFs · polls · view once · push notifications · installable app
+
+**[🌐 Try it live at mhtalk.duckdns.org](https://mhtalk.duckdns.org)** &nbsp;·&nbsp; [🎬 Demo video](docs/media/demo.mp4) &nbsp;·&nbsp; [📸 Screenshots](#-screenshots) &nbsp;·&nbsp; [🏗 Architecture](#-architecture)
 
 [![CI](https://github.com/MuhammadHaseeb3112/MHTalk/actions/workflows/django.yml/badge.svg)](https://github.com/MuhammadHaseeb3112/MHTalk/actions/workflows/django.yml)
+[![Deploy](https://github.com/MuhammadHaseeb3112/MHTalk/actions/workflows/deploy.yml/badge.svg)](https://github.com/MuhammadHaseeb3112/MHTalk/actions/workflows/deploy.yml)
+![Tests](https://img.shields.io/badge/tests-365%20passing-2ea44f)
 ![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
 ![Django](https://img.shields.io/badge/Django-6-092E20?logo=django&logoColor=white)
 ![Channels](https://img.shields.io/badge/Django%20Channels-WebSockets-44B78B)
@@ -14,14 +20,18 @@ Chats, groups, voice and video calls (including group calls), status updates, po
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)
 ![WebRTC](https://img.shields.io/badge/WebRTC-calls-333333?logo=webrtc)
-![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-<img src="docs/screenshots/desktop-dark.png" alt="MHTalk desktop, dark theme" width="100%">
+<br>
 
-<img src="docs/screenshots/phone-chats-dark.png" alt="Chat list on a phone" width="24%"> <img src="docs/screenshots/phone-chat-light.png" alt="Group chat with a poll, light theme" width="24%"> <img src="docs/screenshots/phone-group-dark.png" alt="Group chat, dark theme" width="24%"> <img src="docs/screenshots/phone-updates-dark.png" alt="Status updates" width="24%">
+<img src="docs/media/demo.gif" alt="Two users chatting in real time: a desktop browser on the left and a phone on the right exchange messages, stickers and emoji instantly" width="100%">
+
+<sub>Real recording: a desktop browser (left) and a phone (right) talking through the live stack. Messages, typing, stickers and read ticks arrive instantly over WebSockets. <a href="docs/media/demo.mp4">Watch the MP4</a>.</sub>
 
 </div>
+
+> **Try it yourself:** open **[mhtalk.duckdns.org](https://mhtalk.duckdns.org)**, sign up with any phone number (no SMS needed), then open it in a second browser or on your phone with another account and start chatting. On a phone, choose **Install app** in the browser menu to get the home-screen app.
 
 ---
 
@@ -30,9 +40,10 @@ Chats, groups, voice and video calls (including group calls), status updates, po
 | | |
 |---|---|
 | **Scope** | ~90 REST endpoints, 4 WebSocket channels, 5 Django apps, a React single-page app and a PWA service worker |
-| **Quality** | 342 automated backend tests (run on SQLite and PostgreSQL), N+1 query guards, ESLint, Playwright end-to-end runs, GitHub Actions CI |
+| **Quality** | 365 automated backend tests (run on SQLite and PostgreSQL), N+1 query guards, ESLint, Playwright end-to-end runs, GitHub Actions CI |
 | **Performance** (2 vCPU, measured) | 400 WebSocket connections opened in under 3 s · 2,000 requests at 50 concurrency with 0 errors · a message reached 200 open tabs in 120 ms |
-| **Deployment** | One-command Docker Compose stack: Caddy (automatic HTTPS), uvicorn workers, PostgreSQL, Redis, scheduler, TURN server |
+| **Deployment** | Live on a free Oracle Cloud server. Every push to `main` is tested, deployed, health-checked and **rolled back automatically** if it fails |
+| **Operations** | Nightly database and weekly media backups to object storage (30-day retention), uptime monitoring, in-app "new version" prompt |
 
 ## 🎯 Engineering highlights
 
@@ -43,13 +54,17 @@ What this project demonstrates beyond the features themselves:
 - **Security by design.** JWT with refresh rotation and a blacklist, permission and privacy checks on every endpoint and socket, rate limiting, link previews protected against SSRF (private and loopback addresses are blocked, even after redirects), and view-once media that is never reachable by URL.
 - **WebRTC calling.** One-to-one and group calls (mesh, up to 8 people) with signalling over WebSockets, screen sharing, and short-lived TURN credentials minted by the server.
 - **Product polish.** A layout closely modelled on WhatsApp Web, a separate phone layout, light and dark themes, an in-browser photo editor (draw, text, shapes, blur, crop), offline support, and Web Push notifications that arrive even when the app is closed.
-- **DevOps.** CI on every push, continuous deployment with a health check and **automatic rollback**, nightly backups copied off the server, production Dockerfiles, a Caddy reverse proxy with automatic HTTPS, and a step-by-step guide for a free Oracle Cloud deployment.
+- **Media pipeline.** Uploads up to 100 MB, videos trimmed on the server with ffmpeg (stream copy, no re-encode), a built-in photo editor, and an original sticker set generated from code (SVG → WebP).
+- **Web platform depth.** An installable PWA with its own service worker, Web Push, an offline shell, a version-aware "Update now / Later" prompt, and a **Web Share Target**, so photos, videos and GIFs can be shared into MHTalk from other apps on Android.
+- **DevOps.** CI on every push, continuous deployment with a health check and **automatic rollback**, nightly backups uploaded to object storage with a 30-day lifecycle rule, uptime monitoring, production Dockerfiles, a Caddy reverse proxy with automatic HTTPS, and a step-by-step guide for a free Oracle Cloud deployment.
 
 ---
 
 ## Table of contents
 
 - [Features](#-features)
+- [Screenshots](#-screenshots)
+- [Engineering decisions](#-engineering-decisions)
 - [Tech stack](#-tech-stack)
 - [Architecture](#-architecture)
 - [Quick start (local)](#-quick-start-local)
@@ -78,6 +93,11 @@ What this project demonstrates beyond the features themselves:
 - Photos, videos, documents and audio: multi-select composer, captions, a photo editor (draw, text, shapes, blur, emoji, crop / rotate, HD or standard quality), camera capture, and a lightbox. **Voice notes** with pause-and-listen, waveform and playback speed.
 - Search across all chats, starred messages, shared media / docs / links per chat and across all chats.
 
+### Stickers, GIFs & emoji
+- **Sticker packs for everyone**: three original packs (MHTalk Buddy, Kitty and "Say it" with Salam, Shukriya, InshaAllah, LOL…), searchable by word, plus **Recent** and **My stickers**. Any image can be turned into a sticker, and stickers you receive can be saved with a long press.
+- **GIF search** (GIPHY) with quick chips (Haha, Love, Sad, Party…) and recent GIFs from your chats.
+- **Emoji search across every emoji** ("cry", "red heart", "pizza"), a WhatsApp-style panel docked under the composer on phones, and big-emoji messages.
+
 ### Groups
 - Admins, add / remove members, promote / demote, exit group.
 - **Group permissions**: control who can edit group info, who can send messages, and who can add members.
@@ -89,11 +109,59 @@ What this project demonstrates beyond the features themselves:
 - Call history with a missed-call filter, call cards in the chat, and server-issued **TURN** credentials for users on strict networks.
 
 ### Status, privacy & app
-- **Status** (text / photo / video, 24 h) with audience control (my contacts, contacts except…, only share with…), viewers list and reactions.
+- **Status** (text / photo / video, 24 h) with audience control (my contacts, contacts except…, only share with…), viewers list and reactions. Videos can be **trimmed before posting** (status is limited to 60 seconds, like WhatsApp).
 - **Privacy**: last seen and online, profile photo, about, a read-receipts toggle, blocking (WhatsApp rules), and **delete my account**.
-- **Installable app (PWA)** with an offline shell and an update prompt. **Web Push notifications** for messages and calls, even when the app is closed.
+- **Installable app (PWA)** with an offline shell, a small **"New version — Update now / Later"** card (also in Settings → App update, with release notes), and **Share → MHTalk** from other Android apps. **Web Push notifications** for messages and calls, even when the app is closed.
 - **Light / dark / system theme**, a WhatsApp-style phone layout (bottom tabs, floating buttons, press-and-hold menus) and the desktop WhatsApp-Web layout.
 - **MHTalk AI**: an assistant chat that works with free Google Gemini or Groq keys (OpenAI and Anthropic are also supported).
+
+---
+
+## 📸 Screenshots
+
+<table>
+<tr>
+<td colspan="2"><img src="docs/screenshots/desktop-dark.png" alt="Desktop, dark theme: family group with a live poll"></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/screenshots/desktop-light.png" alt="Desktop, light theme: project group chat"><br><sub><b>Light theme</b>: group chat with sender names and colours</sub></td>
+<td width="50%"><img src="docs/screenshots/desktop-stickers.png" alt="Sticker panel with the Say it pack"><br><sub><b>Sticker packs</b>: searchable, with Recent and My stickers</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/screenshots/desktop-update-card.png" alt="New version card"><br><sub><b>Update prompt</b>: Update now or Later, hides itself after 12 s</sub></td>
+<td width="50%"><img src="docs/screenshots/desktop-voice-call.png" alt="Voice call on desktop"><br><sub><b>Calls</b>: voice and video over WebRTC, screen sharing, reactions</sub></td>
+</tr>
+</table>
+
+<p align="center">
+<img src="docs/screenshots/phone-chats-dark.png" alt="Chat list on a phone" width="19%">
+<img src="docs/screenshots/phone-group-dark.png" alt="Group chat with a poll" width="19%">
+<img src="docs/screenshots/phone-stickers.png" alt="Sticker panel on a phone" width="19%">
+<img src="docs/screenshots/phone-emoji-search.png" alt="Emoji search for heart" width="19%">
+<img src="docs/screenshots/phone-voice-call.png" alt="Voice call on a phone" width="19%">
+</p>
+<p align="center">
+<img src="docs/screenshots/phone-updates-dark.png" alt="Status updates list" width="19%">
+<img src="docs/screenshots/phone-status-view.png" alt="Viewing a text status" width="19%">
+<img src="docs/screenshots/phone-update-card.png" alt="New version card on a phone" width="19%">
+</p>
+
+---
+
+## 🧠 Engineering decisions
+
+A few problems that shaped the design, and how they were solved:
+
+| Problem | Decision |
+|---|---|
+| A message sent through one server process must reach users connected to another. | Every real-time event goes through a **Redis channel layer**; nothing lives in process memory, so workers can be added freely and WebSockets need no sticky sessions. |
+| Chat lists get slower as data grows (the classic N+1 query problem). | Each list endpoint runs a **fixed number of queries**, and tests fail if 2 chats and 6 chats ever need a different count. Read receipts for hundreds of messages are written in about 7 queries. |
+| Android keyboards (Gboard) refuse to insert GIFs and stickers into web pages: the browser does not accept rich content from the keyboard. | Built an **in-app emoji / GIF / sticker panel** like WhatsApp's, and registered MHTalk as a **Web Share Target** so content shared from other apps opens a "Send to…" picker. |
+| A bad release should never take the live site down. | Deploys tag the running images first, then health-check the new version through the real HTTPS path; on failure the script **restores the previous commit and images** on its own. |
+| Users keep old versions open in their browser for days. | The service worker and a release-notes file let the app **detect a newer version**, show a short "Update now / Later" card, and swap versions without losing the session. |
+| Videos are large and status clips must be short. | Trimming happens **on the server with ffmpeg stream copy** (`-c copy`), which is fast and lossless; if trimming fails the original is kept. |
+| A free server can disappear (hardware failure, account limits). | **Nightly database and weekly media backups** go to object storage outside the server, old copies expire after 30 days by a lifecycle rule, and an uptime monitor emails on any outage. |
+| Privacy rules are easy to get subtly wrong. | Privacy is enforced on the server before data leaves the API, and every rule has tests. One audience leak in status visibility was found in review, fixed, and locked down with new tests. |
 
 ---
 
@@ -108,7 +176,9 @@ What this project demonstrates beyond the features themselves:
 | Cache / rate limits | Redis |
 | Frontend | React 19, Vite, lucide-react, a hand-written service worker (PWA + Web Push) |
 | Production | Docker Compose, Caddy (automatic HTTPS), WhiteNoise, optional S3-compatible media |
-| Quality | 342 backend tests (SQLite + PostgreSQL), query-count (N+1) guards, ESLint, Playwright end-to-end runs, GitHub Actions CI |
+| Media | ffmpeg (server-side video trimming), Pillow, an SVG → WebP sticker generator |
+| Operations | GitHub Actions (CI + CD with rollback), Oracle Cloud Always Free VM, Object Storage backups, UptimeRobot monitoring |
+| Quality | 365 backend tests (SQLite + PostgreSQL), query-count (N+1) guards, ESLint, Playwright end-to-end runs, GitHub Actions CI |
 
 ---
 
@@ -195,7 +265,7 @@ Keep `.env` files out of Git. They are already in `.gitignore`.
 ## 🧪 Testing
 
 ```bash
-# backend: 342 tests, no PostgreSQL/Redis needed
+# backend: 365 tests, no PostgreSQL/Redis needed
 DJANGO_SETTINGS_MODULE=config.settings.test python manage.py test
 
 # frontend
@@ -233,7 +303,7 @@ This starts Caddy (HTTPS + app), uvicorn workers, PostgreSQL, Redis, a scheduler
 
 ```mermaid
 flowchart LR
-    P["git push main"] --> CI["CI: 342 tests on PostgreSQL + Redis,<br/>lint, frontend build"]
+    P["git push main"] --> CI["CI: 365 tests on PostgreSQL + Redis,<br/>lint, frontend build"]
     CI -- pass --> D["Deploy: SSH → deploy/deploy.sh"]
     D --> B["Tag running images :rollback<br/>pull, build, restart"]
     B --> H{"Health check<br/>backend + through Caddy"}
@@ -243,7 +313,8 @@ flowchart LR
 
 - **CI** ([`django.yml`](.github/workflows/django.yml)) runs on every push and pull request.
 - **CD** ([`deploy.yml`](.github/workflows/deploy.yml) + [`deploy/deploy.sh`](deploy/deploy.sh)) deploys `main` only after CI passes, then verifies the live site.
-- **Backups** ([`deploy/backup.sh`](deploy/backup.sh)): a nightly `pg_dump`, kept 14 days and copied off the server with rclone (Oracle Object Storage, Always Free).
+- **Backups** ([`deploy/backup.sh`](deploy/backup.sh)): a nightly `pg_dump` and a weekly archive of uploaded files, uploaded to Oracle Object Storage (Always Free) through a write-only pre-authenticated URL. A lifecycle rule deletes copies older than 30 days, so storage never fills up.
+- **Monitoring**: an uptime check on `/api/health/` (backend + database) emails on any outage. Docker restarts every service after a reboot.
 
 ---
 
@@ -302,7 +373,8 @@ frontend/
   src/services/    sockets, notifications, theme
   pwa/             service worker + build plugin
 deploy/            production Dockerfiles, Caddyfile, entrypoint, deploy + backup scripts, env template
-docs/              deployment guides, screenshots
+docs/              deployment guides, screenshots, demo video
+frontend/scripts/  sticker pack generator (SVG → WebP)
 docker-compose.yml        local development
 docker-compose.prod.yml   production stack
 ```
@@ -334,10 +406,11 @@ docker-compose.prod.yml   production stack
 
 I designed and built MHTalk end to end: the data model, the REST API and WebSocket protocol, the real-time and calling layers, the React interface, the test suite and the production deployment.
 
-**Skills shown here:** Python · Django · Django REST Framework · Django Channels · WebSockets · PostgreSQL · Redis · WebRTC · React · JavaScript · REST API design · system design · query optimisation · automated testing · Docker · CI/CD · Linux servers · cloud deployment.
+**Skills shown here:** Python · Django · Django REST Framework · Django Channels · WebSockets · PostgreSQL · Redis · WebRTC · React · JavaScript · PWA / service workers · REST API design · system design · query optimisation · automated testing · Docker · CI/CD · GitHub Actions · Linux servers · Oracle Cloud · backups and monitoring.
 
 I'm open to backend and full-stack roles and to freelance projects.
 
+- Live app: [mhtalk.duckdns.org](https://mhtalk.duckdns.org)
 - GitHub: [@MuhammadHaseeb3112](https://github.com/MuhammadHaseeb3112)
 
 If you find this project useful, please ⭐ the repository.
