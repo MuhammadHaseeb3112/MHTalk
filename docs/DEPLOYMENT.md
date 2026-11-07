@@ -73,10 +73,14 @@ charged on the free tier.
    ```
 4. Open `https://yourname.duckdns.org`. Caddy obtains the HTTPS certificate automatically.
 
-Updating later: `git pull` and then the same `up -d --build` command. Migrations run automatically.
+Updating later: push to `main`. GitHub Actions runs the tests, then
+`deploy/deploy.sh` builds, health-checks and rolls back on failure (setup in
+[DEPLOY_ORACLE.md](DEPLOY_ORACLE.md#automatic-deploys-cd)). By hand:
+`bash deploy/deploy.sh`. Migrations run automatically.
 
-Backups: `docker compose -f docker-compose.prod.yml exec db pg_dump -U mhtalk mhtalk > backup.sql`
-(keep it off GitHub — `*.sql` is git-ignored).
+Backups: `deploy/backup.sh` (nightly database dump, weekly uploaded-files
+archive, copied to Object Storage); see [DEPLOY_ORACLE.md](DEPLOY_ORACLE.md#nightly-backups).
+Keep dumps off GitHub (`*.sql` is git-ignored).
 
 ## 3. Option B: free PaaS pieces (no server to manage)
 
@@ -108,4 +112,5 @@ EC2 instance; the managed equivalents are RDS (PostgreSQL), ElastiCache
 - [ ] `python manage.py check --deploy` shows no security errors.
 - [ ] `/api/health/` returns `{"status": "ok"}`.
 - [ ] A voice call works between two phones on mobile data (TURN works).
-- [ ] Database backups are scheduled.
+- [ ] Database backups are scheduled and copied off the server.
+- [ ] An uptime monitor checks `/api/health/`.

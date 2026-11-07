@@ -119,7 +119,8 @@ Fill in your domain everywhere (`DOMAIN`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS
 `CORS_ALLOWED_ORIGINS`, `TURN_URLS`) and the generated secrets. Set
 `TURN_EXTERNAL_IP=<public IP>/<private IP>` so calls work through Oracle's NAT
 (the private IP is the first address printed by `hostname -I`). Optional:
-`MHTALK_AI_API_KEY` (free Gemini key) and the push-notification keys
+`MHTALK_AI_API_KEY` (free Gemini key), `GIPHY_API_KEY` (free key from
+developers.giphy.com, turns on GIF search) and the push-notification keys
 (Step 8). Save with **Ctrl+O**, **Enter**, **Ctrl+X**.
 
 ## Step 8. Start everything
@@ -159,18 +160,21 @@ and the padlock should appear. Admin: `/admin/`, API docs: `/api/docs/`.
 ### Nightly backups
 
 `deploy/backup.sh` writes a compressed database dump to `~/backups` (kept 14
-days). Run it every night at 03:00: `mkdir -p ~/backups`, then `crontab -e` and add
+days). The server clock is UTC, so `0 22 * * *` runs at 03:00 in Pakistan
+(UTC+5); adjust for your time zone. Add it once (and check with `crontab -l` that
+there is only one backup line):
 
-```cron
-0 3 * * * cd ~/mhtalk && bash deploy/backup.sh >> ~/backups/backup.log 2>&1
+```bash
+mkdir -p ~/backups
+(crontab -l 2>/dev/null; echo "0 22 * * * cd ~/mhtalk && bash deploy/backup.sh >> ~/backups/backup.log 2>&1") | crontab -
 ```
 
 The script also archives uploaded files (photos, videos, voice notes) every
 Sunday (`BACKUP_MEDIA_NOW=1 bash deploy/backup.sh` makes one now).
 
 **Copy backups off the server.** A backup on the same machine is lost with the
-machine. Oracle's Always Free tier includes 20 GB of Object Storage, which is
-separate from the VM.
+machine. Oracle's Always Free tier includes free Object Storage (the console
+shows the current limit), which is separate from the VM.
 
 Simplest way (no keys, nothing to install):
 
@@ -180,9 +184,18 @@ Simplest way (no keys, nothing to install):
    request**: target *Bucket*, access *Permit object writes*, expiration a few
    years ahead. Copy the URL (shown once; it ends in `/o/`).
 3. In `.env.prod` set `BACKUP_UPLOAD_URL=<that URL>`, then test with
-   `bash deploy/backup.sh`; the files appear in the bucket's *Objects* list.
-   Old copies in the bucket are not deleted automatically; delete them from
-   the console now and then (or add a lifecycle rule).
+   `BACKUP_MEDIA_NOW=1 bash deploy/backup.sh`; both files appear in the
+   bucket's *Objects* list.
+4. **Delete old copies automatically** (so the bucket never fills up):
+   - ☰ → **Identity & Security → Policies** → compartment *(root)* → **Create
+     Policy**, name `backup-cleanup`, *Show manual editor*, and paste
+     (use your own region identifier):
+     ```
+     Allow service objectstorage-me-dubai-1 to manage object-family in tenancy
+     ```
+   - Bucket → **Management → Lifecycle policy rules → Create rule**: name
+     `delete-old-backups`, target *Objects*, action *Delete*, *30* days, filter
+     *Include by prefix* `mhtalk-`, state *Enabled*.
 
 Or with rclone (can also delete old copies):
 
@@ -213,9 +226,12 @@ Restore: see the comment at the top of `deploy/backup.sh`.
 **Uptime monitoring (free):** add `https://<domain>/api/health/` to
 https://uptimerobot.com to get an email if the site goes down.
 
-**Idle reclaim:** Oracle may reclaim Always Free machines that stay almost idle
-for a long time. Real usage plus the health checks keep it active. Sign in to the
-console at least once a month too.
+**Idle reclaim:** Oracle may stop an Always Free VM it considers idle: over 7
+days, 95th-percentile CPU, network and (on A1) memory all below 20%. A small
+app can look idle. Oracle emails first; a stopped VM keeps its disk and can be
+started again (Console → Compute → Instances → **Start**). Docker restarts
+every service on boot, the uptime monitor tells you when the site is down,
+and the off-server backups protect the data either way.
 
 **Keep it at $0:** never click *Upgrade* (to *Pay As You Go*). Without the
 upgrade, Oracle can't bill you: when the 30-day trial ends, only Always Free
@@ -237,7 +253,17 @@ on its own** if the new one isn't healthy. Workflow: `.github/workflows/deploy.y
 2. **Secrets** tab → *New repository secret*, three times:
    - `DEPLOY_HOST`: the server's public IP
    - `DEPLOY_USER`: `ubuntu`
-   - `DEPLOY_SSH_KEY`: the whole content of the private `.key` file from Step 2
+   - `DEPLOY_SSH_KEY`: a private key used only for deploys. Create it on the
+     server, authorise it, print it, paste the whole text (from
+     `-----BEGIN` to `-----END OPENSSH PRIVATE KEY-----`) into the secret,
+     then delete the server copy:
+     ```bash
+     ssh-keygen -t ed25519 -f ~/.ssh/github_deploy -N "" -C github-deploy
+     cat ~/.ssh/github_deploy.pub >> ~/.ssh/authorized_keys
+     cat ~/.ssh/github_deploy        # copy this into the secret
+     rm ~/.ssh/github_deploy
+     ```
+     The `ubuntu` user must be in the `docker` group (Step 6).
 3. **Variables** tab → *New repository variable*, twice:
    - `DEPLOY_ENABLED`: `true`
    - `DEPLOY_URL`: `https://<your domain>`
@@ -245,4 +271,5 @@ on its own** if the new one isn't healthy. Workflow: `.github/workflows/deploy.y
    "Healthy. Deployed …".
 
 Until `DEPLOY_ENABLED` is `true` the Deploy workflow is skipped, so pushing
-before the server exists is safe.
+before the server exists is safe. If a run fails within seconds with
+`ssh: no key found`, the key was pasted incompletely; paste it again.
