@@ -5,7 +5,9 @@ previews. Every endpoint checks chat membership first.
 
 import json
 import mimetypes
+import re
 
+from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
@@ -171,6 +173,19 @@ class DisappearingMessagesAPIView(APIView):
         return Response({"room": room.id, "disappearing_seconds": room.disappearing_seconds, "message": data})
 
 
+PHONE_AGENT = re.compile(r"Android|iPhone|iPad|iPod|Mobile", re.IGNORECASE)
+
+
+def is_phone_request(request):
+    """
+    View once opens only on phones, like WhatsApp: a desktop browser can't
+    stop screenshots or screen recording. The client checks this too; this
+    server check stops a desktop from fetching the file through the API.
+    (A user agent can be faked, so this raises the bar; it is not proof.)
+    """
+    return bool(PHONE_AGENT.search(request.META.get("HTTP_USER_AGENT", "")))
+
+
 class ViewOnceMediaAPIView(APIView):
     """
     The only way to get a view once photo, video or voice message. Each recipient may download
@@ -188,6 +203,11 @@ class ViewOnceMediaAPIView(APIView):
             raise Http404("Not found")
         if message.sender_id == request.user.id:
             return Response({"detail": "You can't open view once media you sent."}, status=status.HTTP_403_FORBIDDEN)
+        if getattr(settings, "VIEW_ONCE_PHONE_ONLY", True) and not is_phone_request(request):
+            return Response(
+                {"detail": "For added privacy, you can only open view once messages on your phone.", "code": "phone_only"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         joined = Participant.objects.filter(room_id=message.room_id, user=request.user).values_list("joined_at", flat=True).first()
         if joined is None or joined > message.created_at:
             raise Http404("Not found")

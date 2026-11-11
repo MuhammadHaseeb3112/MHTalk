@@ -5,7 +5,7 @@
     "title": "Swipe to reply, safer view once",
     "items": [
       "Swipe a message to the right to reply, like WhatsApp.",
-      "View once media is now protected: it hides when you switch apps or press a screenshot key, cannot be saved or printed, and shows your number as a watermark."
+      "View once media now opens only on your phone, like WhatsApp (computers can't block screenshots). On the phone it hides when you switch apps, can't be saved, and shows your number as a watermark."
     ]
   },
   {

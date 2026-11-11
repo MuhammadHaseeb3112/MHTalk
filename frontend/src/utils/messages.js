@@ -368,3 +368,11 @@ export function activeReaction(room) {
   if (last && new Date(last.created_at) >= new Date(reaction.created_at)) return null;
   return reaction;
 }
+
+/**
+ * View once opens only on phones, like WhatsApp: a desktop browser can't stop
+ * screenshots or screen recording. The server checks the same user agent.
+ */
+export function canOpenViewOnceHere() {
+  return typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
+}

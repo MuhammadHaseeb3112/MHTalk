@@ -8,7 +8,7 @@ import { useMediaQuery } from "../../hooks";
 import { toast } from "../../services/toast";
 import { applyMessagePatch, openChatWith, reactTo, retryMessage, sendFile, toggleStar, togglePinMessage, votePoll } from "../../store/actions";
 import { getState, useStore } from "../../store/store";
-import { attachmentKind, contactsByUser, displayUserName, groupAbilities, isSavedContact, messageKind, profileName, roomTitle } from "../../utils/messages";
+import { attachmentKind, contactsByUser, displayUserName, groupAbilities, isSavedContact, messageKind, profileName, roomTitle, canOpenViewOnceHere } from "../../utils/messages";
 import { askBlock } from "../chat-list/roomMenu";
 import { IconButton, Menu } from "../common/ui";
 import { useApp } from "../layout/AppContext";
@@ -28,7 +28,7 @@ import ReactionPicker from "./ReactionPicker";
 import { DeleteMessagesDialog, ForwardDialog, ReactionsDialog } from "./dialogs";
 import { confirmAction } from "../common/dialogs";
 import ViewContactDialog from "./ViewContactDialog";
-import { DisappearingDialog, PollVotesDialog, ViewOnceViewer } from "./FeatureDialogs";
+import { DisappearingDialog, PollVotesDialog, ViewOncePhoneOnly, ViewOnceViewer } from "./FeatureDialogs";
 import StatusViewer from "../status/StatusViewer";
 
 /**
@@ -286,7 +286,8 @@ export default function Conversation({ roomId }) {
           setDialog({ type: "pollVotes", message });
           break;
         case "viewOnce":
-          setViewOnce(message);
+          if (canOpenViewOnceHere()) setViewOnce(message);
+          else setDialog({ type: "viewOncePhone", message });
           break;
         case "openStatus": {
           // A reaction card points at a status: open it like WhatsApp does.
@@ -566,6 +567,7 @@ export default function Conversation({ roomId }) {
           }}
         />
       ) : null}
+      {dialog?.type === "viewOncePhone" ? <ViewOncePhoneOnly onClose={() => setDialog(null)} /> : null}
       {dialog?.type === "pollVotes" ? (
         <PollVotesDialog
           message={messagesFor().find((m) => m.id === dialog.message.id) || dialog.message}

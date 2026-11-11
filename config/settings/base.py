@@ -370,6 +370,9 @@ CHAT_MAX_UPLOAD_MB = config("CHAT_MAX_UPLOAD_MB", default=100, cast=int)
 
 # MHTalk AI (assistant chat). Leave the key empty to turn it off.
 # Providers: gemini (free key, default), groq (free key), openai, anthropic.
+# View once media opens only on phones (desktop browsers allow screenshots).
+VIEW_ONCE_PHONE_ONLY = config("VIEW_ONCE_PHONE_ONLY", default=True, cast=bool)
+
 MHTALK_AI_PROVIDER = config("MHTALK_AI_PROVIDER", default="gemini")
 MHTALK_AI_API_KEY = config("MHTALK_AI_API_KEY", default="")
 MHTALK_AI_MODEL = config("MHTALK_AI_MODEL", default="")

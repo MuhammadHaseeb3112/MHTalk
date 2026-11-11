@@ -60,8 +60,12 @@ def make_room(*users, group=False):
     return room
 
 
-def client_for(user):
-    client = APIClient()
+PHONE_UA = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/131.0 Mobile Safari/537.36"
+DESKTOP_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36"
+
+
+def client_for(user, agent=PHONE_UA):
+    client = APIClient(HTTP_USER_AGENT=agent)
     client.force_authenticate(user)
     return client
 
@@ -476,6 +480,16 @@ class ViewOnceTests(TestCase):
         self.assertFalse(ViewOnceOpen.objects.exists())
         normal = self.upload(view_once=False).data["data"]["id"]
         self.assertEqual(self.bob_client.get(f"/api/chat/messages/{normal}/view-once/").status_code, 404)
+
+    def test_view_once_opens_only_on_a_phone(self):
+        message_id = self.upload().data["data"]["id"]
+        url = f"/api/chat/messages/{message_id}/view-once/"
+        desktop = client_for(self.bob, DESKTOP_UA)
+        response = desktop.get(url)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data["code"], "phone_only")
+        self.assertFalse(ViewOnceOpen.objects.exists())  # a refused try doesn't use it up
+        self.assertEqual(self.bob_client.get(url).status_code, 200)
 
     def test_member_who_joined_later_cannot_open(self):
         carol = make_user("+923400000003")

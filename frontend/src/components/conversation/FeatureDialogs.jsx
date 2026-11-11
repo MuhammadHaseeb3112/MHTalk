@@ -343,6 +343,30 @@ function fetchViewOnce(id) {
   return viewOnceRequests.get(id);
 }
 
+/** Shown on a computer: view once opens only on a phone, like WhatsApp. */
+export function ViewOncePhoneOnly({ onClose }) {
+  return (
+    <Modal
+      onClose={onClose}
+      width={380}
+      className="view-once-phone"
+      footer={
+        <button type="button" className="btn btn--primary" onClick={onClose}>
+          OK
+        </button>
+      }
+    >
+      <div className="view-once-phone__body">
+        <span className="view-once-phone__icon">
+          <ViewOnceIcon size={34} />
+        </span>
+        <h2>Open it on your phone</h2>
+        <p>You received a view once message. For added privacy, you can only open it on your phone.</p>
+      </div>
+    </Modal>
+  );
+}
+
 /**
  * Downloads the view once media (allowed exactly once) and shows it full
  * screen. Nothing is cached: closing the viewer revokes the object URL.
