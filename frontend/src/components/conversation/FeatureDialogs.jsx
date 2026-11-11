@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { LocateFixed, Radio, Timer, X } from "lucide-react";
+import { EyeOff, LocateFixed, Radio, Timer, X } from "lucide-react";
 import { errorMessage } from "../../api/client";
 import { messageApi } from "../../api/endpoints";
 import { setDisappearing } from "../../store/actions";
+import { useStore } from "../../store/store";
+import { formatPhone } from "../../utils/phone";
 import { DISAPPEARING_OPTIONS, viewOnceState } from "../../utils/messages";
 import { Avatar, IconButton, Modal, Spinner, Toggle } from "../common/ui";
 import AudioPlayer from "../messages/AudioPlayer";
@@ -380,17 +382,73 @@ export function ViewOnceViewer({ message, nameOf, onOpened, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message.id]);
 
+  // Capture protection. A web page cannot block screenshots (only native
+  // apps can), so the viewer does what a browser allows: the media is
+  // covered the moment the window loses focus, the tab is hidden, or a
+  // capture shortcut is pressed (PrintScreen, Win/Cmd combos), saving and
+  // printing are blocked, and the viewer's number is watermarked across
+  // the media so a leaked capture points back to who took it.
+  const [shielded, setShielded] = useState(() => document.hidden || !document.hasFocus());
+  const stageRef = useRef(null);
   useEffect(() => {
-    const onKey = (event) => event.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    // Stop playback while the media is covered.
+    if (shielded) stageRef.current?.querySelectorAll("video, audio").forEach((media) => media.pause());
+  }, [shielded]);
+  const me = useStore((state) => state.me);
+  const watermark = formatPhone(me?.phone_number) || me?.profile?.display_name || "";
+  useEffect(() => {
+    const hide = () => setShielded(true);
+    const show = () => {
+      if (!document.hidden && document.hasFocus()) setShielded(false);
+    };
+    const onKey = (event) => {
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+      const capture = event.key === "PrintScreen" || event.key === "Meta" || event.key === "OS" || event.metaKey;
+      const saveOrPrint = (event.ctrlKey || event.metaKey) && ["s", "p"].includes(event.key.toLowerCase());
+      if (capture || saveOrPrint) {
+        setShielded(true);
+        if (saveOrPrint) event.preventDefault();
+        // Best effort: replace a PrintScreen capture on the clipboard.
+        if (event.key === "PrintScreen") navigator.clipboard?.writeText("").catch(() => {});
+      }
+    };
+    const onKeyUp = (event) => {
+      if (event.key === "PrintScreen") {
+        setShielded(true);
+        navigator.clipboard?.writeText("").catch(() => {});
+      }
+    };
+    const block = (event) => event.preventDefault();
+    window.addEventListener("blur", hide);
+    window.addEventListener("focus", show);
+    window.addEventListener("pagehide", hide);
+    window.addEventListener("beforeprint", hide);
+    document.addEventListener("visibilitychange", hide);
+    document.addEventListener("keydown", onKey, true);
+    document.addEventListener("keyup", onKeyUp, true);
+    document.addEventListener("copy", block, true);
+    document.addEventListener("dragstart", block, true);
+    return () => {
+      window.removeEventListener("blur", hide);
+      window.removeEventListener("focus", show);
+      window.removeEventListener("pagehide", hide);
+      window.removeEventListener("beforeprint", hide);
+      document.removeEventListener("visibilitychange", hide);
+      document.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("keyup", onKeyUp, true);
+      document.removeEventListener("copy", block, true);
+      document.removeEventListener("dragstart", block, true);
+    };
   }, [onClose]);
 
   const isVoice = voice || state.type.startsWith("audio/");
   const isVideo = !isVoice && (state.type ? state.type.startsWith("video/") : video);
   const noun = isVoice ? "voice message" : isVideo ? "video" : "photo";
   return createPortal(
-    <div className="lightbox view-once-viewer" role="dialog" aria-label="View once media" onContextMenu={(event) => event.preventDefault()}>
+    <div className={`lightbox view-once-viewer ${shielded ? "is-shielded" : ""}`} role="dialog" aria-label="View once media" onContextMenu={(event) => event.preventDefault()}>
       <header className="lightbox__top">
         <ViewOnceIcon size={26} />
         <div className="lightbox__who">
@@ -401,7 +459,7 @@ export function ViewOnceViewer({ message, nameOf, onOpened, onClose }) {
           <IconButton icon={X} label="Close" onClick={onClose} />
         </div>
       </header>
-      <div className="lightbox__stage" onClick={(event) => event.target === event.currentTarget && onClose()}>
+      <div className="lightbox__stage" ref={stageRef} onClick={(event) => event.target === event.currentTarget && onClose()}>
         {state.error ? (
           <p className="view-once-viewer__error">{state.error}</p>
         ) : !state.url ? (
@@ -415,6 +473,20 @@ export function ViewOnceViewer({ message, nameOf, onOpened, onClose }) {
         ) : (
           <img src={state.url} alt="View once" draggable={false} />
         )}
+        {state.url && !isVoice && watermark ? (
+          <div className="view-once-viewer__watermark" aria-hidden="true">
+            {Array.from({ length: 24 }, (_, index) => (
+              <span key={index}>{watermark}</span>
+            ))}
+          </div>
+        ) : null}
+        {shielded && state.url ? (
+          <button type="button" className="view-once-viewer__shield" onClick={() => setShielded(false)}>
+            <EyeOff size={34} />
+            <strong>Hidden for privacy</strong>
+            <span>Screenshots and screen recording are not allowed for view once media. Tap to show it again.</span>
+          </button>
+        ) : null}
       </div>
       <p className="lightbox__caption view-once-viewer__note">This {noun} is set to view once. It will disappear when you close it.</p>
     </div>,

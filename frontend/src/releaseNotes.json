@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.40.0",
+    "date": "2026-11-11",
+    "title": "Swipe to reply, safer view once",
+    "items": [
+      "Swipe a message to the right to reply, like WhatsApp.",
+      "View once media is now protected: it hides when you switch apps or press a screenshot key, cannot be saved or printed, and shows your number as a watermark."
+    ]
+  },
+  {
     "version": "1.39.0",
     "date": "2026-11-07",
     "title": "Sticker packs, better emoji & GIF search, update card",

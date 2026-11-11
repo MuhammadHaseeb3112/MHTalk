@@ -914,3 +914,44 @@ mark.search-hit {
   font-weight: 600;
   cursor: pointer;
 }
+
+/* Swipe right to reply (touch) */
+.msg-row {
+  position: relative;
+}
+.msg-row .bubble {
+  touch-action: pan-y;
+}
+.msg-row.is-swiping .msg-row__inner,
+.msg-row.is-swipe-back .msg-row__inner {
+  transform: translateX(var(--swipe, 0px));
+}
+.msg-row.is-swipe-back .msg-row__inner {
+  transition: transform 0.18s ease-out;
+}
+.msg-row__swipe {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-top: -16px;
+  border-radius: 50%;
+  background: var(--panel-raised, var(--menu-bg));
+  color: var(--text-secondary);
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  pointer-events: none;
+}
+.msg-row.is-swiping .msg-row__swipe {
+  opacity: 0.7;
+  transform: scale(0.85);
+}
+.msg-row.is-swiping.is-swipe-ready .msg-row__swipe {
+  opacity: 1;
+  transform: scale(1);
+  color: var(--accent);
+}

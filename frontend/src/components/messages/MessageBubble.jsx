@@ -1,23 +1,5 @@
 import { memo, useRef, useState } from "react";
-import {
-  Ban,
-  ChevronDown,
-  Download,
-  FileText,
-  Forward,
-  Image as ImageIcon,
-  Phone,
-  PhoneIncoming,
-  PhoneMissed,
-  PhoneOutgoing,
-  Pin,
-  Play,
-  RotateCw,
-  Smile,
-  Star,
-  Video,
-  Video as VideoIcon,
-} from "lucide-react";
+import { Ban, ChevronDown, Download, FileText, Forward, Image as ImageIcon, Phone, PhoneIncoming, PhoneMissed, PhoneOutgoing, Pin, Play, Reply, RotateCw, Smile, Star, Video, Video as VideoIcon } from "lucide-react";
 import { mediaUrl } from "../../api/client";
 import { emojiOnly } from "../../utils/emoji";
 import { clockTime, duration as formatDuration, fileSize } from "../../utils/format";
@@ -28,6 +10,9 @@ import { Ticks } from "../chat-list/ChatListItem";
 import AudioPlayer from "./AudioPlayer";
 import { LinkPreviewCard,
   ContactCard, LocationCard, PollCard, ViewOnceContent } from "./FeatureCards";
+
+const SWIPE_REPLY_AT = 64; // px the row must travel to reply
+const SWIPE_MAX = 96;
 
 const EMOJI_ONLY = /^(?:\p{Extended_Pictographic}|\p{Emoji_Component}|‍|️|\s)+$/u;
 
@@ -419,6 +404,27 @@ function MessageBubble({
     }
     pressRef.current = null;
   };
+  // Swipe right on a message to reply, like WhatsApp. The row follows the
+  // finger through a CSS variable, so nothing re-renders while dragging.
+  const swipeRef = useRef(null);
+  const endSwipe = () => {
+    const swipe = swipeRef.current;
+    swipeRef.current = null;
+    cancelPress();
+    if (!swipe?.active) return;
+    const row = swipe.row;
+    row.classList.remove("is-swiping", "is-swipe-ready");
+    row.classList.add("is-swipe-back");
+    row.style.setProperty("--swipe", "0px");
+    window.setTimeout(() => {
+      row.classList.remove("is-swipe-back");
+      row.style.removeProperty("--swipe");
+    }, 200);
+    if (swipe.dx >= SWIPE_REPLY_AT) {
+      navigator.vibrate?.(12);
+      onAction("reply", message);
+    }
+  };
   // Touch screens, like WhatsApp: press and hold selects the message and
   // shows the reaction bar; then tapping other messages adds them.
   const startPress = (event) => {
@@ -426,6 +432,7 @@ function MessageBubble({
     const touch = event.touches[0];
     const anchorEl = event.currentTarget;
     cancelPress();
+    swipeRef.current = message.is_deleted ? null : { x: touch.clientX, y: touch.clientY, dx: 0, active: false, row: anchorEl.closest(".msg-row") };
     pressRef.current = {
       x: touch.clientX,
       y: touch.clientY,
@@ -447,6 +454,25 @@ function MessageBubble({
   const movePress = (event) => {
     const touch = event.touches[0];
     if (pressRef.current && touch && Math.hypot(touch.clientX - pressRef.current.x, touch.clientY - pressRef.current.y) > 10) cancelPress();
+    const swipe = swipeRef.current;
+    if (!swipe || !touch || !swipe.row) return;
+    const dx = touch.clientX - swipe.x;
+    const dy = touch.clientY - swipe.y;
+    if (!swipe.active) {
+      // Vertical movement is a scroll: give up on this touch.
+      if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) {
+        swipeRef.current = null;
+        return;
+      }
+      if (dx < 14 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      swipe.active = true;
+      swipe.row.classList.add("is-swiping");
+    }
+    const before = swipe.dx;
+    swipe.dx = Math.max(0, Math.min(dx, SWIPE_MAX));
+    if (before < SWIPE_REPLY_AT && swipe.dx >= SWIPE_REPLY_AT) navigator.vibrate?.(8);
+    swipe.row.style.setProperty("--swipe", `${swipe.dx}px`);
+    swipe.row.classList.toggle("is-swipe-ready", swipe.dx >= SWIPE_REPLY_AT);
   };
 
   const kind = messageKind(message);
@@ -558,6 +584,11 @@ function MessageBubble({
           <Checkbox checked={selected} onChange={() => onAction("toggleSelect", message)} label="Select message" />
         </span>
       ) : null}
+      {!selectMode && !message.is_deleted ? (
+        <span className="msg-row__swipe" aria-hidden="true">
+          <Reply size={18} />
+        </span>
+      ) : null}
       <div className="msg-row__inner">
         <div
           className={`bubble bubble--${isOwn ? "out" : "in"} ${isMedia ? "bubble--media" : ""} ${emojiOnly ? "bubble--emoji" : ""} bubble--${kind}`}
@@ -565,8 +596,8 @@ function MessageBubble({
           onContextMenu={!selectMode && !pending ? (event) => { event.preventDefault(); onAction("menu", message, event); } : undefined}
           onTouchStart={startPress}
           onTouchMove={movePress}
-          onTouchEnd={cancelPress}
-          onTouchCancel={cancelPress}
+          onTouchEnd={endSwipe}
+          onTouchCancel={endSwipe}
         >
           {showTail && !emojiOnly ? <BubbleTail side={isOwn ? "out" : "in"} /> : null}
           {senderName && !isOwn ? (
