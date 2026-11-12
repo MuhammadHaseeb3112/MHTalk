@@ -54,3 +54,17 @@
 		max_size 110MB
 	}
 }
+
+# SaaS Billing: a separate project on the same server. Its nginx container
+# joins the shared "edge" network (see docker-compose.prod.yml) under the
+# name saas-billing-frontend. Set BILLING_DOMAIN in .env.prod.
+{$BILLING_DOMAIN:billing.localhost} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+
+	reverse_proxy saas-billing-frontend:80
+}

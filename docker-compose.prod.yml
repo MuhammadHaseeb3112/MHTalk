@@ -21,6 +21,11 @@ services:
       - "443:443/udp"
     environment:
       DOMAIN: ${DOMAIN:-localhost}
+      # Second site served by this Caddy (SaaS Billing demo, own stack).
+      BILLING_DOMAIN: ${BILLING_DOMAIN:-billing.localhost}
+    networks:
+      - default
+      - edge
     volumes:
       # nocopy: never seed the shared media volume with this image's own
       # /media folder (root-owned), which would stop the backend writing uploads.
@@ -137,6 +142,13 @@ services:
           esac
         fi
         exec turnserver "$$@"
+
+networks:
+  # Shared with the SaaS Billing stack. Only this Caddy and that project's
+  # nginx join it, so neither project's "web" service can reach the other.
+  # Create it once on the server:  docker network create edge
+  edge:
+    external: true
 
 volumes:
   postgres_data:
