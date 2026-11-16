@@ -23,6 +23,8 @@ services:
       DOMAIN: ${DOMAIN:-localhost}
       # Second site served by this Caddy (SaaS Billing demo, own stack).
       BILLING_DOMAIN: ${BILLING_DOMAIN:-billing.localhost}
+      # Third site: MarketHub demo (own stack, joins "edge" as markethub-web).
+      MARKETHUB_DOMAIN: ${MARKETHUB_DOMAIN:-markethub.localhost}
     networks:
       - default
       - edge
