@@ -1,0 +1,49 @@
+name: Add SSH key to server
+
+# One-off helper: adds a PUBLIC key to the server's ~/.ssh/authorized_keys,
+# using the deploy key that GitHub Actions already has. Use it when your own
+# SSH key is lost. Run from Actions → "Add SSH key to server" → Run workflow,
+# paste the contents of your .pub file. Never paste a private key.
+
+on:
+  workflow_dispatch:
+    inputs:
+      public_key:
+        description: "Public key (one line, starts with ssh-ed25519 or ssh-rsa)"
+        required: true
+
+jobs:
+  add-key:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check the input is a public key
+        env:
+          PUBKEY: ${{ inputs.public_key }}
+        run: |
+          case "$PUBKEY" in
+            ssh-ed25519\ *|ssh-rsa\ *|ecdsa-sha2-*) ;;
+            *) echo "Not a public key line"; exit 1 ;;
+          esac
+          case "$PUBKEY" in *PRIVATE*) echo "That looks like a private key"; exit 1 ;; esac
+
+      - name: Add it on the server
+        uses: appleboy/ssh-action@v1
+        env:
+          PUBKEY: ${{ inputs.public_key }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: PUBKEY
+          script: |
+            set -e
+            mkdir -p ~/.ssh && chmod 700 ~/.ssh
+            touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys
+            if grep -qxF "$PUBKEY" ~/.ssh/authorized_keys; then
+              echo "Key already present"
+            else
+              echo "$PUBKEY" >> ~/.ssh/authorized_keys
+              echo "Key added"
+            fi
+            echo "Keys on server: $(wc -l < ~/.ssh/authorized_keys)"
