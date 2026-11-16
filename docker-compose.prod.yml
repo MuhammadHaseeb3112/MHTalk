@@ -25,6 +25,8 @@ services:
       BILLING_DOMAIN: ${BILLING_DOMAIN:-billing.localhost}
       # Third site: MarketHub demo (own stack, joins "edge" as markethub-web).
       MARKETHUB_DOMAIN: ${MARKETHUB_DOMAIN:-markethub.localhost}
+      # Fourth site: Advanced Blog System demo (own stack, joins "edge" as blog-web).
+      BLOG_DOMAIN: ${BLOG_DOMAIN:-blog.localhost}
     networks:
       - default
       - edge
