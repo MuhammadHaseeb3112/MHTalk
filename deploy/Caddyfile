@@ -82,3 +82,17 @@
 
 	reverse_proxy markethub-web:8000
 }
+
+# Advanced Blog System: a separate project on the same server. Its Daphne
+# container (HTTP + WebSockets) joins the shared "edge" network as blog-web.
+# Set BLOG_DOMAIN in .env.prod.
+{$BLOG_DOMAIN:blog.localhost} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+
+	reverse_proxy blog-web:8000
+}
